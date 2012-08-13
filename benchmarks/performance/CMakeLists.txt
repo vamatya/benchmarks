@@ -1,4 +1,4 @@
-# Copyright (c) 2012 Hartmut Kaiser
+# Copyright (c) 2007-2012 Hartmut Kaiser
 #
 # Distributed under the Boost Software License, Version 1.0. (See accompanying
 # file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -6,17 +6,8 @@
 set(benchmarks
     hpx_homogeneous_task_spawn)
 
-# this is a hack for now, we will do a proper integration of component linking
-# in the future
-if(MSVC)
-    set(dependencies
-        ${dependencies}
-        iostreams${HPX_POSTFIX})
-else()
-    set(dependencies
-        ${dependencies}
-        hpx_component_iostreams${HPX_POSTFIX})
-endif()
+set(component_dependencies
+    iostreams)
 
 foreach(benchmark ${benchmarks})
   set(sources
@@ -29,7 +20,7 @@ foreach(benchmark ${benchmarks})
     SOURCES ${sources}
     ${${benchmark}_FLAGS}
     FOLDER "Benchmarks/Performance/${benchmark}"
-    DEPENDENCIES ${dependencies})
+    COMPONENT_DEPENDENCIES ${component_dependencies})
 
   # add a custom target for this example
   add_hpx_pseudo_target(benchmarks.performance.${benchmark})

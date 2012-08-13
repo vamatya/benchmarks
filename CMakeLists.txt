@@ -37,10 +37,6 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE ${HPX_BUILD_TYPE} CACHE STRING "Configuration type (one of Debug, RelWithDebInfo, Release, MinSizeRel)" FORCE)
 endif()
 
-if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
-  set(HPX_POSTFIX ${HPX_DEBUG_POSTFIX})
-endif()
-
 include_directories(${HPX_INCLUDE_DIR})
 link_directories(${HPX_LIBRARY_DIR})
 

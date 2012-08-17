@@ -21,9 +21,9 @@ add_hpx_component(pingpong
     FOLDER "Benchmarks/Statistical/pingpong")
 
 set(benchmarks
-    create_comps_analysis
+#    create_comps_analysis
     create_parcels_analysis
-    free_comps_analysis
+#    free_comps_analysis
     general_apply_analysis
     general_apply_dir_analysis
     general_create_cont_analysis
@@ -37,14 +37,14 @@ set(benchmarks
     get_gid_analysis
     intranode_latency_analysis
     join_threads_analysis
-    parcel_sr_analysis
+    parcel_send_analysis
     spawn_threads_analysis
-    thread_cleanup_analysis
+#    thread_cleanup_analysis
    )
 
-set(create_comps_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams empty)
+#set(create_comps_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams empty)
 set(create_parcels_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams)
-set(free_comps_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams empty)
+#set(free_comps_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams empty)
 set(general_apply_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams)
 set(general_apply_dir_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams)
 set(general_create_cont_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams)
@@ -58,9 +58,9 @@ set(get_gid_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams)
 set(get_base_gid_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams)
 set(intranode_latency_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams pingpong)
 set(join_threads_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams)
-set(parcel_sr_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams sender receiver)
+set(parcel_send_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams sender receiver)
 set(spawn_threads_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams)
-set(thread_cleanup_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams)
+#set(thread_cleanup_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams)
 
 foreach(benchmark ${benchmarks})
   set(sources

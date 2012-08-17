@@ -12,6 +12,7 @@ set(benchmarks
     hpx_heterogeneous_task_spawn
 #    print_heterogeneous_payloads
     sizeof
+    thread_cs_analysis
    )
 
 if(MSVC)
@@ -124,6 +125,7 @@ set(hpx_heterogeneous_task_spawn_FLAGS COMPONENT_DEPENDENCIES iostreams)
 #endif()
 
 set(sizeof_FLAGS COMPONENT_DEPENDENCIES iostreams)
+set(thread_cs_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams)
 
 foreach(benchmark ${benchmarks})
   set(sources

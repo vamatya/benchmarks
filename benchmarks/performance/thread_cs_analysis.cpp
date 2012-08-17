@@ -3,20 +3,43 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#include "statstd.hpp"
 #include <hpx/include/threadmanager.hpp>
 #include <hpx/util/lightweight_test.hpp>
-#include <boost/assign/std/vector.hpp>
 #include <boost/lexical_cast.hpp>
+
+#include <vector>
+#include <string>
+#include <hpx/hpx_init.hpp>
+#include <hpx/include/lcos.hpp>
+#include <hpx/include/actions.hpp>
+#include <hpx/include/iostreams.hpp>
+#include <hpx/include/components.hpp>
+#include <hpx/util/high_resolution_timer.hpp>
+
+using boost::program_options::variables_map;
+using boost::program_options::options_description;
+using boost::uint64_t;
+using hpx::util::high_resolution_timer;
 
 void loop_function(uint64_t iters){
     volatile double bigcount = iters;
     for(uint64_t i = 0; i < iters; i++){
         bigcount*=2;
-        bigcount/=2;
+        bigcount*=.5;
+        if(i % 10000 == 0)
+            bigcount += 3;
     }
 }
 
+void loop_function2(uint64_t iters){
+    volatile double bigcount = iters;
+    for(uint64_t i = 0; i < iters; i++){
+        bigcount*=2;
+        bigcount*=.5;
+        if(i % 10000 == 0)
+            hpx::this_thread::suspend();
+    }
+}
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -31,8 +54,7 @@ int hpx_main(variables_map& vm){
     int threads = vm["hpx-threads"].as<int>();
     int os;
     if(!vm.count("hpx:threads")) os = 1;
-    else os = atoi(vm["hpx:threads"].as<string>().c_str());
-    csv = (vm.count("csv") ? true : false);
+    else os = atoi(vm["hpx:threads"].as<std::string>().c_str());
     run_tests(num, threads, os);
     return hpx::finalize();
 }
@@ -50,13 +72,9 @@ int main(int argc, char* argv[]){
             "number of iterations the loop function will iterate over")
         ("hpx-threads,H",
             boost::program_options::value<int>()->default_value(2),
-            "number of simultaneous hpx threads running")
-        ("csv",
-            "output results as csv "
-            "(format:count,mean,accurate mean,variance,min,max)");
+            "number of simultaneous hpx threads running");
 
     // Initialize and run HPX
-    outname = argv[0];
     return hpx::init(desc_commandline, argc, argv);
 }
 
@@ -66,7 +84,7 @@ int main(int argc, char* argv[]){
 void run_tests(uint64_t num, int threads, int os){
     double time1, time2;
     int i;
-    vector<hpx::thread> funcs;
+    std::vector<hpx::thread> funcs;
     //first measure how long it takes to spawn threads
     //then measure how long it takes to join them back together
     printf("\nNOTE: for now, this benchmark is only intended to obtain the \n"
@@ -77,20 +95,26 @@ void run_tests(uint64_t num, int threads, int os){
     loop_function(num);
     time1 = t.elapsed();
 
-    t.restart();
-    for(i = 0; i < threads; ++i)
-        funcs.push_back(hpx::thread(&loop_function, num));
-    for(i = 0; i < threads; ++i)
-        funcs[i].join();
-    time2 = t.elapsed()*os/threads;
-
     printf("Executing the function once sequentially yields a total time of "
         "%f s\n", time1);
+
+    t.restart();
+    for(i = 0; i < threads; ++i)
+        funcs.push_back(hpx::thread(&loop_function2, num));
+    for(i = 0; i < threads; ++i)
+        funcs[i].join();
+    time2 = t.elapsed()*std::min(threads,os)/threads;
+
     printf("Executing the function %d times simultaneously on %d cores yields "
         "an average time of %f s\n\n", threads, os, time2);
 
-    printf("Estimated time spent context switching is %f s\n\n", time2-time1);
+    printf("Total number of context switches per thread is approximately %ld\n",
+        num/10000);
+    printf("Estimated time spent context switching is %f s\n", time2-time1);
     printf("Estimated percentage of time spent context switching is %f %%\n\n",
         (1-time1/(time2))*100);
+
+    printf("Calculated mean time per context switch is %f ns\n\n",
+        (time2-time1)*1e9/num*10000);
 }
 

@@ -40,7 +40,6 @@ set(benchmarks
     parcel_sr_analysis
     spawn_threads_analysis
     thread_cleanup_analysis
-    thread_cs_analysis
    )
 
 set(create_comps_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams empty)
@@ -62,7 +61,6 @@ set(join_threads_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams)
 set(parcel_sr_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams sender receiver)
 set(spawn_threads_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams)
 set(thread_cleanup_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams)
-set(thread_cs_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams)
 
 foreach(benchmark ${benchmarks})
   set(sources

@@ -9,16 +9,14 @@ cmake_minimum_required(VERSION 2.8)
 cmake_policy(SET CMP0015 NEW)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+
 ################################################################################
-# Build type (needs to be handled before project command below)
-################################################################################
-###############################################################################
 # enable solution folders for MSVC
 if(MSVC)
   set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 endif()
 
-###############################################################################
+################################################################################
 # Find and include HPX settings
 if(NOT HPX_ROOT)
   if(NOT $ENV{HPX_ROOT} STREQUAL "")
@@ -29,19 +27,15 @@ if(NOT HPX_ROOT)
   message(FATAL_ERROR "HPX_ROOT not set, unable to find hpx!")
 endif()
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${HPX_INSTALL_DIR}/share/cmake-${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION}/Modules)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${HPX_ROOT}/share/cmake-${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION}/Modules)
 
-find_package(HPX)
+find_package(HPX REQUIRED)
 
-if(NOT HPX_FOUND)
-  message(FATAL_ERROR "could not find HPX")
-endif()
-
-#################################################################
+################################################################################
 include_directories(${HPX_INCLUDE_DIR})
 link_directories(${HPX_LIBRARY_DIR})
 
-###############################################################################
+################################################################################
 # just recurse into the benchmark subdirectory and execute the scripts there
 add_hpx_pseudo_target(benchmarks)
 add_subdirectory(benchmarks)

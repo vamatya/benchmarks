@@ -20,6 +20,7 @@ add_hpx_component(pingpong
     SOURCES "pingpong/pingpong.cpp"
     FOLDER "Benchmarks/Statistical/pingpong")
 
+
 set(benchmarks
 #    create_comps_analysis
     create_parcels_analysis
@@ -42,25 +43,25 @@ set(benchmarks
 #    thread_cleanup_analysis
    )
 
-#set(create_comps_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams empty)
-set(create_parcels_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams)
-#set(free_comps_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams empty)
-set(general_apply_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams)
-set(general_apply_dir_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams)
-set(general_create_cont_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams)
-#set(general_dataflow_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams dataflow)
-set(general_destroy_futures_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams)
-set(general_get_futures_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams)
-set(general_get_immresults_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams)
-set(general_get_oldresults_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams)
-set(general_pa_create_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams)
-set(get_gid_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams)
-set(get_base_gid_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams)
-set(intranode_latency_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams pingpong)
-set(join_threads_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams)
-set(parcel_send_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams sender receiver)
-set(spawn_threads_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams)
-#set(thread_cleanup_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams)
+#set(create_comps_analysis_FLAGS DEPENDENCIES iostreams empty)
+set(create_parcels_analysis_FLAGS DEPENDENCIES iostreams)
+#set(free_comps_analysis_FLAGS DEPENDENCIES iostreams empty)
+set(general_apply_analysis_FLAGS DEPENDENCIES iostreams)
+set(general_apply_dir_analysis_FLAGS DEPENDENCIES iostreams)
+set(general_create_cont_analysis_FLAGS DEPENDENCIES iostreams)
+#set(general_dataflow_analysis_FLAGS DEPENDENCIES iostreams dataflow)
+set(general_destroy_futures_analysis_FLAGS DEPENDENCIES iostreams)
+set(general_get_futures_analysis_FLAGS DEPENDENCIES iostreams)
+set(general_get_immresults_analysis_FLAGS DEPENDENCIES iostreams)
+set(general_get_oldresults_analysis_FLAGS DEPENDENCIES iostreams)
+set(general_pa_create_analysis_FLAGS DEPENDENCIES iostreams)
+set(get_gid_analysis_FLAGS DEPENDENCIES iostreams)
+set(get_base_gid_analysis_FLAGS DEPENDENCIES iostreams)
+set(intranode_latency_analysis_FLAGS DEPENDENCIES iostreams pingpong_component)
+set(join_threads_analysis_FLAGS DEPENDENCIES iostreams)
+set(parcel_send_analysis_FLAGS DEPENDENCIES iostreams sender_component receiver_component)
+set(spawn_threads_analysis_FLAGS DEPENDENCIES iostreams)
+#set(thread_cleanup_analysis_FLAGS DEPENDENCIES iostreams)
 
 foreach(benchmark ${benchmarks})
   set(sources

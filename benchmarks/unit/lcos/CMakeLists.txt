@@ -19,7 +19,7 @@ set(benchmarks
 
 set(barrier_PARAMETERS THREADS_PER_LOCALITY 4)
 
-set(dataflow_FLAGS COMPONENT_DEPENDENCIES dataflow)
+set(dataflow_FLAGS DEPENDENCIES dataflow)
 set(dataflow_PARAMETERS THREADS_PER_LOCALITY 4)
 
 set(deferred_packaged_task_PARAMETERS THREADS_PER_LOCALITY 4)

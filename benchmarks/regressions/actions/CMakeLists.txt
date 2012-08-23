@@ -13,25 +13,25 @@ set(benchmarks
    )
 
 set(plain_action_move_semantics_FLAGS
-    COMPONENT_DEPENDENCIES action_move_semantics)
+    DEPENDENCIES action_move_semantics)
 set(plain_action_move_semantics_PARAMETERS
     LOCALITIES 2
     THREADS_PER_LOCALITY 2)
 
 set(plain_action_dataflow_move_semantics_FLAGS
-    COMPONENT_DEPENDENCIES dataflow action_move_semantics)
+    DEPENDENCIES dataflow action_move_semantics)
 set(plain_action_dataflow_move_semantics_PARAMETERS
     LOCALITIES 2
     THREADS_PER_LOCALITY 2)
 
 set(component_action_move_semantics_FLAGS
-    COMPONENT_DEPENDENCIES action_move_semantics)
+    DEPENDENCIES action_move_semantics)
 set(component_action_move_semantics_PARAMETERS
     LOCALITIES 2
     THREADS_PER_LOCALITY 2)
 
 set(remote_object_move_semantics_FLAGS
-    COMPONENT_DEPENDENCIES dataflow action_move_semantics remote_object)
+    DEPENDENCIES dataflow action_move_semantics remote_object)
 set(remote_object_move_semantics_PARAMETERS
     LOCALITIES 2
     THREADS_PER_LOCALITY 2)

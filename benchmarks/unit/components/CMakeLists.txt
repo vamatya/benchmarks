@@ -8,7 +8,7 @@ set(benchmarks
    )
 
 set(remote_object_FLAGS
-    COMPONENT_DEPENDENCIES iostreams remote_object)
+    DEPENDENCIES iostreams remote_object)
 set(remote_object_PARAMETERS
     LOCALITIES 2
     THREADS_PER_LOCALITY 2)

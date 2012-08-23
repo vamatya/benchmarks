@@ -106,9 +106,9 @@ set(native_tls_overhead_FLAGS NOLIBS
 set(hpx_tls_overhead_FLAGS NOLIBS
     DEPENDENCIES ${boost_library_dependencies})
 
-set(hpx_homogeneous_task_spawn_FLAGS COMPONENT_DEPENDENCIES iostreams)
+set(hpx_homogeneous_task_spawn_FLAGS DEPENDENCIES iostreams)
 
-set(hpx_heterogeneous_task_spawn_FLAGS COMPONENT_DEPENDENCIES iostreams)
+set(hpx_heterogeneous_task_spawn_FLAGS DEPENDENCIES iostreams)
 
 #if(HPX_CXX11_LAMBDAS)
 #  set(benchmarks ${benchmarks}
@@ -117,15 +117,15 @@ set(hpx_heterogeneous_task_spawn_FLAGS COMPONENT_DEPENDENCIES iostreams)
 #      spinlock_overhead2
 #     )
 
-#  set(packaged_task_overhead_FLAGS COMPONENT_DEPENDENCIES iostreams)
+#  set(packaged_task_overhead_FLAGS DEPENDENCIES iostreams)
 
-#  set(spinlock_overhead1_FLAGS COMPONENT_DEPENDENCIES iostreams)
+#  set(spinlock_overhead1_FLAGS DEPENDENCIES iostreams)
 
-#  set(spinlock_overhead2_FLAGS COMPONENT_DEPENDENCIES iostreams)
+#  set(spinlock_overhead2_FLAGS DEPENDENCIES iostreams)
 #endif()
 
-set(sizeof_FLAGS COMPONENT_DEPENDENCIES iostreams)
-set(thread_cs_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams)
+set(sizeof_FLAGS DEPENDENCIES iostreams)
+set(thread_cs_analysis_FLAGS DEPENDENCIES iostreams)
 
 foreach(benchmark ${benchmarks})
   set(sources

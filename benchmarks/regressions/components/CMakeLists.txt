@@ -20,7 +20,7 @@ foreach(test ${benchmarks})
       ${test}.cpp)
 
   source_group("Source Files" FILES ${sources})
-  set(${test}_FLAGS COMPONENT_DEPENDENCIES iostreams)
+  set(${test}_FLAGS DEPENDENCIES iostreams)
 
   # add example executable
   add_hpx_executable(${test}_test

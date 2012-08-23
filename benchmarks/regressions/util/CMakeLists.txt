@@ -8,7 +8,7 @@ set(benchmarks
     function_argument
    )
 
-set(function_argument_FLAGS COMPONENT_DEPENDENCIES iostreams)
+set(function_argument_FLAGS DEPENDENCIES iostreams)
 
 foreach(test ${benchmarks})
   set(sources

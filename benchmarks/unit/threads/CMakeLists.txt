@@ -17,14 +17,14 @@ if(HPX_CXX11_LAMBDAS)
 endif()
 
 set(thread_affinity_FLAGS
-    COMPONENT_DEPENDENCIES iostreams)
+    DEPENDENCIES iostreams)
 
 set(set_thread_state_PARAMETERS THREADS_PER_LOCALITY 4)
 
 set(thread_PARAMETERS THREADS_PER_LOCALITY 4)
 
 set(thread_affinity_FLAGS
-    COMPONENT_DEPENDENCIES iostreams)
+    DEPENDENCIES iostreams)
 set(thread_affinity_PARAMETERS THREADS_PER_LOCALITY 4)
 
 set(thread_id_PARAMETERS THREADS_PER_LOCALITY 4)

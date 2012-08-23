@@ -22,80 +22,80 @@ set(benchmarks
    )
 
 set(scoped_ref_to_local_object_FLAGS
-    COMPONENT_DEPENDENCIES simple_refcnt_checker
+    DEPENDENCIES simple_refcnt_checker
                  managed_refcnt_checker)
 set(scoped_ref_to_local_object_PARAMETERS
     THREADS_PER_LOCALITY 4)
 
 set(scoped_ref_to_remote_object_FLAGS
-    COMPONENT_DEPENDENCIES simple_refcnt_checker
+    DEPENDENCIES simple_refcnt_checker
                  managed_refcnt_checker)
 set(scoped_ref_to_remote_object_PARAMETERS
     LOCALITIES 2
     THREADS_PER_LOCALITY 2)
 
 set(local_embedded_ref_to_local_object_FLAGS
-    COMPONENT_DEPENDENCIES simple_refcnt_checker
+    DEPENDENCIES simple_refcnt_checker
                  managed_refcnt_checker)
 set(local_embedded_ref_to_local_object_PARAMETERS
     THREADS_PER_LOCALITY 4)
 
 set(local_embedded_ref_to_remote_object_FLAGS
-    COMPONENT_DEPENDENCIES simple_refcnt_checker
+    DEPENDENCIES simple_refcnt_checker
                  managed_refcnt_checker)
 set(local_embedded_ref_to_remote_object_PARAMETERS
     LOCALITIES 2
     THREADS_PER_LOCALITY 2)
 
 set(remote_embedded_ref_to_local_object_FLAGS
-    COMPONENT_DEPENDENCIES simple_refcnt_checker
+    DEPENDENCIES simple_refcnt_checker
                  managed_refcnt_checker)
 set(remote_embedded_ref_to_local_object_PARAMETERS
     LOCALITIES 2
     THREADS_PER_LOCALITY 2)
 
 set(remote_embedded_ref_to_remote_object_FLAGS
-    COMPONENT_DEPENDENCIES simple_refcnt_checker
+    DEPENDENCIES simple_refcnt_checker
                  managed_refcnt_checker)
 set(remote_embedded_ref_to_remote_object_PARAMETERS
     LOCALITIES 2
     THREADS_PER_LOCALITY 2)
 
 set(refcnted_symbol_to_local_object_FLAGS
-    COMPONENT_DEPENDENCIES simple_refcnt_checker
+    DEPENDENCIES simple_refcnt_checker
                  managed_refcnt_checker)
 set(refcnted_symbol_to_local_object_PARAMETERS
     THREADS_PER_LOCALITY 4)
 
 set(refcnted_symbol_to_remote_object_FLAGS
-    COMPONENT_DEPENDENCIES simple_refcnt_checker
+    DEPENDENCIES simple_refcnt_checker
                  managed_refcnt_checker)
 set(refcnted_symbol_to_remote_object_PARAMETERS
     LOCALITIES 2
     THREADS_PER_LOCALITY 2)
 
 set(uncounted_symbol_to_local_object_FLAGS
-    COMPONENT_DEPENDENCIES simple_refcnt_checker
+    DEPENDENCIES simple_refcnt_checker
                  managed_refcnt_checker)
 set(uncounted_symbol_to_local_object_PARAMETERS
     THREADS_PER_LOCALITY 4)
 
 set(uncounted_symbol_to_remote_object_FLAGS
-    COMPONENT_DEPENDENCIES simple_refcnt_checker
+    DEPENDENCIES simple_refcnt_checker
                  managed_refcnt_checker)
 set(uncounted_symbol_to_remote_object_PARAMETERS
     LOCALITIES 2
     THREADS_PER_LOCALITY 2)
 
 set(credit_exhaustion_FLAGS
-    COMPONENT_DEPENDENCIES simple_refcnt_checker
+    DEPENDENCIES simple_refcnt_checker
                  managed_refcnt_checker)
 set(credit_exhaustion_PARAMETERS
     LOCALITIES 2
     THREADS_PER_LOCALITY 2)
 
 set(split_credit_FLAGS
-    COMPONENT_DEPENDENCIES simple_refcnt_checker
+    DEPENDENCIES simple_refcnt_checker
                  managed_refcnt_checker)
 set(split_credit_PARAMETERS
     LOCALITIES 2

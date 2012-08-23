@@ -14,7 +14,7 @@
 #include <hpx/components/remote_object/new.hpp>
 #include <hpx/components/dataflow/dataflow_object.hpp>
 
-#include <tests/regressions/actions/components/movable_objects.hpp>
+#include "components/movable_objects.hpp"
 
 #include <hpx/util/lightweight_test.hpp>
 

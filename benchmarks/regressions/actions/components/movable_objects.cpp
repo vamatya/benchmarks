@@ -6,7 +6,7 @@
 #include <hpx/hpx_fwd.hpp>
 #include <hpx/include/serialization.hpp>
 
-#include <tests/regressions/actions/components/movable_objects.hpp>
+#include "movable_objects.hpp"
 
 namespace hpx { namespace test
 {

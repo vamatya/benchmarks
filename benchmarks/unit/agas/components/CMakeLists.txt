@@ -21,14 +21,16 @@
 #  AUTOGLOB)
 
 add_hpx_component(simple_refcnt_checker
-  COMPONENT_DEPENDENCIES iostreams
-  HEADERS "simple_refcnt_checker.hpp"
-  SOURCES "simple_refcnt_checker.cpp"
-  FOLDER "Benchmarks/Unit/AGAS")
+  DEPENDENCIES iostreams
+  HEADER_GLOB "simple_refcnt_checker.h*"
+  SOURCE_GLOB "simple_refcnt_checker.c*"
+  FOLDER "Benchmarks/Unit/AGAS"
+  AUTOGLOB)
 
 add_hpx_component(managed_refcnt_checker
-  COMPONENT_DEPENDENCIES iostreams
-  HEADERS "managed_refcnt_checker.hpp"
-  SOURCES "managed_refcnt_checker.cpp"
-  FOLDER "Benchmarks/Unit/AGAS")
+  DEPENDENCIES iostreams
+  HEADER_GLOB "managed_refcnt_checker.h*"
+  SOURCE_GLOB "managed_refcnt_checker.c*"
+  FOLDER "Benchmarks/Unit/AGAS"
+  AUTOGLOB)
 

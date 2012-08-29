@@ -12,8 +12,8 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/assign/std/vector.hpp>
 
-#include <tests/unit/agas/components/simple_refcnt_checker.hpp>
-#include <tests/unit/agas/components/managed_refcnt_checker.hpp>
+#include "components/simple_refcnt_checker.hpp"
+#include "components/managed_refcnt_checker.hpp"
 
 using boost::program_options::variables_map;
 using boost::program_options::options_description;

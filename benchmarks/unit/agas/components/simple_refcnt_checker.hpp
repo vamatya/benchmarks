@@ -13,7 +13,7 @@
 #include <hpx/runtime/components/client_base.hpp>
 #include <hpx/runtime/threads/thread_helpers.hpp>
 
-#include <tests/unit/agas/components/stubs/simple_refcnt_checker.hpp>
+#include "stubs/simple_refcnt_checker.hpp"
 
 namespace hpx { namespace test
 {

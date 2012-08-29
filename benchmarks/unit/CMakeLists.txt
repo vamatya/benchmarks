@@ -6,7 +6,7 @@
 
 set(subdirs
     agas
-#    components
+    components
     diagnostics
     lcos
     performance_counters

@@ -9,8 +9,8 @@
 #include <hpx/include/plain_actions.hpp>
 #include <hpx/include/lcos.hpp>
 
-#include <tests/unit/agas/components/simple_refcnt_checker.hpp>
-#include <tests/unit/agas/components/managed_refcnt_checker.hpp>
+#include "components/simple_refcnt_checker.hpp"
+#include "components/managed_refcnt_checker.hpp"
 
 using boost::program_options::variables_map;
 using boost::program_options::options_description;

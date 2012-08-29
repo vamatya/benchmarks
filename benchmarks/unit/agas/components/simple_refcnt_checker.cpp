@@ -7,7 +7,7 @@
 #include <hpx/include/components.hpp>
 #include <hpx/include/serialization.hpp>
 
-#include <tests/unit/agas/components/server/simple_refcnt_checker.hpp>
+#include "server/simple_refcnt_checker.hpp"
 
 HPX_REGISTER_COMPONENT_MODULE();
 

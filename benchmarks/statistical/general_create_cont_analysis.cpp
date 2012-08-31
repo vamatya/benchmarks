@@ -3,10 +3,15 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
+/*This benchmark measures the amount of time to create a continuation from an
+action. As with all "general" benchmarks in this directory, multiple types of 
+actions can be used based on command line arguments in order to see if different
+action types have different overheads.*/
 #include "general_declarations.hpp"
 #include "statstd.hpp"
 
 ///////////////////////////////////////////////////////////////////////////////
+//create the packaged_actions
 template <typename Vector, typename Package>
 void create_packages(Vector& packages, uint64_t num){
     uint64_t i = 0;
@@ -19,26 +24,17 @@ void create_packages(Vector& packages, uint64_t num){
 ///////////////////////////////////////////////////////////////////////////////
 
 //this runs a series of tests for a packaged_action.apply()
-template <typename Vector, typename Package, typename Action, typename T>
+template <typename Vector, typename Package, typename Action>
 void run_tests(bool, uint64_t);
-template <typename Vector, typename Package, typename Action, typename T>
-void run_tests(bool, uint64_t, T);
-template <typename Vector, typename Package, typename Action, typename T>
-void run_tests(bool, uint64_t, T, T);
-template <typename Vector, typename Package, typename Action, typename T>
-void run_tests(bool, uint64_t, T, T, T);
-template <typename Vector, typename Package, typename Action, typename T>
-void run_tests(bool, uint64_t, T, T, T, T);
 
 ///////////////////////////////////////////////////////////////////////////////
-//all of the measured tests are declared in this section
-
-//base case, just call apply.  used as control to validate other results
-
-//here measures the time it takes to create continuations
+//THIS IS THE ACTUAL BENCHMARK, the measurements of the amount of time required
+//to create a continuation.
 template<typename VectorP, typename VectorC, typename Result>
 void apply_create_continuations(VectorP packages, VectorC& continuations, 
                                 uint64_t num, double ot){
+
+    //rc_type simply refers to a continuation
     typedef hpx::actions::base_lco_continuation<Result> rc_type;
     uint64_t i = 0;
     double mean;
@@ -46,15 +42,22 @@ void apply_create_continuations(VectorP packages, VectorC& continuations,
     vector<double> time;
     vector<hpx::naming::id_type> cgids;
     rc_type* temp;
+    
+    //first obtain the gids of the created packages
     for(; i < num; i++)
         cgids.push_back(packages[i]->get_gid());
+
+    //measure the average time required to create a new continuation
     high_resolution_timer t;
     for(i = 0; i < num; i++)
         temp = new rc_type(cgids[i]);
     mean = t.elapsed()/num;
+
     cgids.clear();
     time.reserve(num);
     continuations.reserve(num);
+    
+    //get a statistical sampling of the creation time of continuations
     for(i = 0; i < num; ++i){
         const hpx::naming::id_type cgid = packages[i]->get_gid();
         high_resolution_timer t1;
@@ -67,10 +70,10 @@ void apply_create_continuations(VectorP packages, VectorC& continuations,
 
 ///////////////////////////////////////////////////////////////////////////////
 //decide which action type to use
-void decide_action_type(bool rtype, uint64_t num, int type, int argc);
+void decide_action_type(uint64_t num, int type, int argc);
 
 //parse the argument types
-void parse_arg(string atype, bool rtype, uint64_t num, int argc){
+void parse_arg(string atype, uint64_t num, int argc){
     int type;
     if(atype.compare("int") == 0) type = 0;
     else if(atype.compare("long") == 0) type = 1;
@@ -81,16 +84,17 @@ void parse_arg(string atype, bool rtype, uint64_t num, int argc){
         std::cerr<<"available types\n";
         return;
     }
-    decide_action_type(rtype, num, type, argc);
+    decide_action_type(num, type, argc);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+//required to run hpx
 int hpx_main(variables_map& vm){
     uint64_t num = vm["number-spawned"].as<uint64_t>();
     string atype = vm["arg-type"].as<string>();
     int c = vm["argc"].as<int>();
     csv = (vm.count("csv") ? true : false);
-    parse_arg(atype, true, num, c);
+    parse_arg(atype, num, c);
     return hpx::finalize();
 }
 
@@ -127,140 +131,68 @@ int main(int argc, char* argv[]){
 ///////////////////////////////////////////////////////////////////////////////
 
 //decide which action type to use
-void decide_action_type(bool rtype, uint64_t num, int type, int argc){
+void decide_action_type(uint64_t num, int type, int argc){
     if(type == 0){
         switch(argc){
             case 0: run_tests<vector<empty_packagei0*>, empty_packagei0, 
-                empty_actioni0, int> (true, num); break;
+                empty_actioni0> (true, num); break;
             case 1: run_tests<vector<empty_packagei1*>, empty_packagei1, 
-                empty_actioni1, int> (true, num, ivar); break;
+                empty_actioni1> (true, num); break;
             case 2: run_tests<vector<empty_packagei2*>, empty_packagei2, 
-                empty_actioni2, int> (true, num, ivar, ivar); break;
+                empty_actioni2> (true, num); break;
             case 3: run_tests<vector<empty_packagei3*>, empty_packagei3, 
-                empty_actioni3, int> (true, num, ivar, ivar, ivar); break;
+                empty_actioni3> (true, num); break;
             default: run_tests<vector<empty_packagei4*>, empty_packagei4, 
-                empty_actioni4, int> (true, num, ivar, ivar, ivar, ivar); 
+                empty_actioni4> (true, num); 
         }
     }
     else if(type == 1){
         switch(argc){
             case 0: run_tests<vector<empty_packagel0*>, empty_packagel0, 
-                empty_actionl0, long> (true, num); break;
+                empty_actionl0> (true, num); break;
             case 1: run_tests<vector<empty_packagel1*>, empty_packagel1, 
-                empty_actionl1, long> (true, num, lvar); break;
+                empty_actionl1> (true, num); break;
             case 2: run_tests<vector<empty_packagel2*>, empty_packagel2, 
-                empty_actionl2, long> (true, num, lvar, lvar); break;
+                empty_actionl2> (true, num); break;
             case 3: run_tests<vector<empty_packagel3*>, empty_packagel3, 
-                empty_actionl3, long> (true, num, lvar, lvar, lvar); break;
+                empty_actionl3> (true, num); break;
             default: run_tests<vector<empty_packagel4*>, empty_packagel4, 
-                empty_actionl4, long> (true, num, lvar, lvar, lvar, lvar);
+                empty_actionl4> (true, num);
         }
     }
     else if(type == 2){
         switch(argc){
             case 0: run_tests<vector<empty_packagef0*>, empty_packagef0, 
-                empty_actionf0, float> (true, num); break;
+                empty_actionf0> (true, num); break;
             case 1: run_tests<vector<empty_packagef1*>, empty_packagef1, 
-                empty_actionf1, float> (true, num, fvar); break;
+                empty_actionf1> (true, num); break;
             case 2: run_tests<vector<empty_packagef2*>, empty_packagef2, 
-                empty_actionf2, float> (true, num, fvar, fvar); break;
+                empty_actionf2> (true, num); break;
             case 3: run_tests<vector<empty_packagef3*>, empty_packagef3, 
-                empty_actionf3, float> (true, num, fvar, fvar, fvar); break;
+                empty_actionf3> (true, num); break;
             default: run_tests<vector<empty_packagef4*>, empty_packagef4, 
-                empty_actionf4, float> (true, num, fvar, fvar, fvar, fvar); 
+                empty_actionf4> (true, num); 
         }
     }
     else{
         switch(argc){
             case 0: run_tests<vector<empty_packaged0*>, empty_packaged0, 
-                empty_actiond0, double> (true, num); break;
+                empty_actiond0> (true, num); break;
             case 1: run_tests<vector<empty_packaged1*>, empty_packaged1, 
-                empty_actiond1, double> (true, num, dvar); break;
+                empty_actiond1> (true, num); break;
             case 2: run_tests<vector<empty_packaged2*>, empty_packaged2, 
-                empty_actiond2, double> (true, num, dvar, dvar); break;
+                empty_actiond2> (true, num); break;
             case 3: run_tests<vector<empty_packaged3*>, empty_packaged3, 
-                empty_actiond3, double> (true, num, dvar, dvar, dvar); break;
+                empty_actiond3> (true, num); break;
             default: run_tests<vector<empty_packaged4*>, empty_packaged4, 
-                empty_actiond4, double> (true, num, dvar, dvar, dvar, dvar);
+                empty_actiond4> (true, num);
         }
     }
 }
 
-//this runs a series of tests for packaged_action.apply()
-template <typename Vector, typename Package, typename Action, typename T>
+//just some overhead before calling the actual benchmark
+template <typename Vector, typename Package, typename Action>
 void run_tests(bool empty, uint64_t num){
-    double ot = timer_overhead(num);
-    vector<double> time;
-    Vector packages;
-    create_packages<Vector, Package>(packages, num);
-    hpx::naming::id_type lid = hpx::find_here();
-    typedef typename hpx::actions::extract_action<Action>::type action_type;
-    typedef 
-        typename hpx::actions::extract_action<action_type>::result_type
-        result_type;
-    typedef hpx::actions::base_lco_continuation<result_type> rc_type;
-    vector<rc_type*> continuations;
-
-    //measures creation time of continuations
-    apply_create_continuations<Vector, vector<rc_type*>, result_type>
-        (packages, continuations, num, ot);
-}
-template <typename Vector, typename Package, typename Action, typename T>
-void run_tests(bool empty, uint64_t num, T a1){
-    double ot = timer_overhead(num);
-    vector<double> time;
-    Vector packages;
-    create_packages<Vector, Package>(packages, num);
-    hpx::naming::id_type lid = hpx::find_here();
-    typedef typename hpx::actions::extract_action<Action>::type action_type;
-    typedef 
-        typename hpx::actions::extract_action<action_type>::result_type
-        result_type;
-    typedef hpx::actions::base_lco_continuation<result_type> rc_type;
-    vector<rc_type*> continuations;
-
-    //measures creation time of continuations
-    apply_create_continuations<Vector, vector<rc_type*>, result_type>
-        (packages, continuations, num, ot);
-}
-template <typename Vector, typename Package, typename Action, typename T>
-void run_tests(bool empty, uint64_t num, T a1, T a2){
-    double ot = timer_overhead(num);
-    vector<double> time;
-    Vector packages;
-    create_packages<Vector, Package>(packages, num);
-    hpx::naming::id_type lid = hpx::find_here();
-    typedef typename hpx::actions::extract_action<Action>::type action_type;
-    typedef 
-        typename hpx::actions::extract_action<action_type>::result_type
-        result_type;
-    typedef hpx::actions::base_lco_continuation<result_type> rc_type;
-    vector<rc_type*> continuations;
-
-    //measures creation time of continuations
-    apply_create_continuations<Vector, vector<rc_type*>, result_type>
-        (packages, continuations, num, ot);
-}
-template <typename Vector, typename Package, typename Action, typename T>
-void run_tests(bool empty, uint64_t num, T a1, T a2, T a3){
-    double ot = timer_overhead(num);
-    vector<double> time;
-    Vector packages;
-    create_packages<Vector, Package>(packages, num);
-    hpx::naming::id_type lid = hpx::find_here();
-    typedef typename hpx::actions::extract_action<Action>::type action_type;
-    typedef 
-        typename hpx::actions::extract_action<action_type>::result_type
-        result_type;
-    typedef hpx::actions::base_lco_continuation<result_type> rc_type;
-    vector<rc_type*> continuations;
-
-    //measures creation time of continuations
-    apply_create_continuations<Vector, vector<rc_type*>, result_type>
-        (packages, continuations, num, ot);
-}
-template <typename Vector, typename Package, typename Action, typename T>
-void run_tests(bool empty, uint64_t num, T a1, T a2, T a3, T a4){
     double ot = timer_overhead(num);
     vector<double> time;
     Vector packages;

@@ -3,6 +3,13 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
+
+/*This file includes a number of functions used in all statistical benchmarks,
+such as finding the mean, variance, min, and max times among a sample set.
+Additionally, the printout command also creates a file with logarithmic
+histogram data, for graphing purposes.*/
+
+//TO-DO: allow histogram data generation to be disabled/enabled via command line
 #ifndef STANDARD_STATISTICAL_FUNCTIONS
 #define STANDARD_STATISTICAL_FUNCTIONS
 #include <vector>
@@ -44,7 +51,7 @@ double timer_overhead(uint64_t iterations){
         cout<<"NOTE - this value will be subtracted from all subsequent timings.\n";
         cout<<"       This value is an average taken at the start of the program\n";
         cout<<"       and as such the timings output by the program may be off\n";
-        cout<<"       by several ( < 10) nanoseconds. \n\n";
+        cout<<"       by several nanoseconds. \n\n";
         cout<<flush;
     }
     return total/iterations;
@@ -80,6 +87,7 @@ inline double sample_max(vector<double> time, double ot){
     return max;
 }
 
+//This function generates histogram data and writes it to a file
 void make_histogram(vector<double> time, double min, double max);
 
 //print out the statistical results of the benchmark

@@ -4,7 +4,7 @@
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
 //this file simply enumerates a multitude of functions used to define the action
-//used in the benchmark.  Which function is used is decided based on input args
+//used in the benchmarks.  Which function is used is decided based on input args
 
 #include <hpx/hpx_init.hpp>
 #include <hpx/include/lcos.hpp>

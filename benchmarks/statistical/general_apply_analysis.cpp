@@ -3,6 +3,12 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
+/*This benchmark measures the time required to apply a packaged action. Actions
+can have up to four arguments and may have four different argument types -- int,
+long, float, or double -- though all arguments must be of the same type. This is
+to see if there is any additional overhead depending on the number of arguments
+or type of arguments*/
+
 #include "general_declarations.hpp"
 #include "statstd.hpp"
 
@@ -31,41 +37,6 @@ template <typename Vector, typename Package, typename Action, typename T>
 void run_tests(bool, uint64_t, T, T, T, T);
 
 ///////////////////////////////////////////////////////////////////////////////
-//all of the measured tests are declared in this section
-
-//base case, just call apply.  used as control to validate other results
-
-//here measures the time it takes to create continuations
-/*template<typename VectorP, typename VectorC, typename Result>
-void apply_create_continuations(VectorP packages, VectorC& continuations, 
-                                uint64_t num, double ot){
-    typedef hpx::actions::base_lco_continuation<Result> rc_type;
-    uint64_t i = 0;
-    double mean;
-    string message = "Measuring time required to create continuations:";
-    vector<double> time;
-    vector<hpx::naming::id_type> cgids;
-    rc_type* temp;
-    for(; i < num; i++)
-        cgids.push_back(packages[i]->get_gid());
-    high_resolution_timer t;
-    for(i = 0; i < num; i++)
-        temp = new rc_type(cgids[i]);
-    mean = t.elapsed()/num;
-    cgids.clear();
-    time.reserve(num);
-    continuations.reserve(num);
-    for(i = 0; i < num; ++i){
-        const hpx::naming::id_type cgid = packages[i]->get_gid();
-        high_resolution_timer t1;
-        continuations.push_back(new rc_type(cgid));
-        time.push_back(t1.elapsed());
-    }
-    printout(time, ot, mean, message);
-}*/
-
-
-///////////////////////////////////////////////////////////////////////////////
 //decide which action type to use
 void decide_action_type(bool rtype, uint64_t num, int type, int argc);
 
@@ -85,6 +56,7 @@ void parse_arg(string atype, bool rtype, uint64_t num, int argc){
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+//required to run hpx
 int hpx_main(variables_map& vm){
     uint64_t num = vm["number-spawned"].as<uint64_t>();
     bool rtype = (vm.count("result-action") ? true : false);
@@ -250,7 +222,9 @@ void decide_action_type(bool rtype, uint64_t num, int type, int argc){
     }
 }
 
-//this runs a series of tests for packaged_action.apply()
+//this is where the actual benchmark is run for packaged_action.apply().
+//all subsequent functions are merely variations of this function and are 
+//lacking in documentation
 template <typename Vector, typename Package, typename Action, typename T>
 void run_tests(bool empty, uint64_t num){
     uint64_t i = 0;
@@ -258,14 +232,24 @@ void run_tests(bool empty, uint64_t num){
     string message;
     vector<double> time;
     Vector packages;
+
+    //first create the packages
     create_packages<Vector, Package>(packages, num);
     hpx::naming::id_type lid = hpx::find_here();
-    //first measure base case
+
+    //first obtain a close approximation to the mean, as the overhead of
+    //invoking the timer should be negligible here
     high_resolution_timer t;
     for(; i < num; ++i) packages[i]->apply(lid);
     double mean = t.elapsed()/num;
+
+    //create new packages to ensure the second set of measurements have as 
+    //similar start conditions as the first set of measurements as possible
     packages.clear();
     create_packages<Vector, Package>(packages, num);
+
+    //obtain finer grain measurements for the statistical analysis.
+    //the mean may be slightly off here, hence the earlier mean measurement.
     time.reserve(num);
     for(i = 0; i < num; ++i){
         high_resolution_timer t1;
@@ -276,53 +260,6 @@ void run_tests(bool empty, uint64_t num){
               "packaged_action.apply():";
     printout(time, ot, mean, message);
     time.clear();
-
-    //now we begin measuring the individual components
-/*    packages.clear();
-    create_packages<Vector, Package>(packages, num);
-
-    if(empty){
-        typedef typename hpx::actions::extract_action<Action>::type action_type;
-        typedef 
-            typename hpx::actions::extract_action<action_type>::result_type
-            result_type;
-        typedef hpx::actions::base_lco_continuation<result_type> rc_type;
-        vector<rc_type*> continuations;
-
-        //measures creation time of continuations
-        apply_create_continuations<Vector, vector<rc_type*>, result_type>
-            (packages, continuations, num, ot);
-
-        //finally apply the continuations directly
-        high_resolution_timer tt;
-        for(i = 0; i < num; i++) 
-            hpx::apply<action_type>(lid);
-        mean = tt.elapsed()/num;
-        time.reserve(num);
-        message = "Measuring time required to apply continuations directly:";
-
-        for(i = 0; i < num; i++){
-            high_resolution_timer t1;
-            hpx::apply<action_type>(lid);
-            time.push_back(t1.elapsed());
-        }
-        printout(time, ot, mean, message);
-    }
-    else{
-        //next test applies actions directly, skipping get_gid stage
-        high_resolution_timer tt;
-        for(i = 0; i < num; ++i)
-            hpx::apply<Action>(lid);
-        mean = tt.elapsed()/num;
-        time.reserve(num);
-        message = "Measuring time required to apply actions directly:";
-        for(i = 0; i < num; i++){
-            high_resolution_timer t1;
-            hpx::apply<Action>(lid);
-            time.push_back(t1.elapsed());
-        }
-        printout(time, ot, mean, message);
-    }*/
 }
 template <typename Vector, typename Package, typename Action, typename T>
 void run_tests(bool empty, uint64_t num, T a1){
@@ -349,53 +286,6 @@ void run_tests(bool empty, uint64_t num, T a1){
               "packaged_action.apply():";
     printout(time, ot, mean, message);
     time.clear();
-
-    //now we begin measuring the individual components
-/*    packages.clear();
-    create_packages<Vector, Package>(packages, num);
-
-    if(empty){
-        typedef typename hpx::actions::extract_action<Action>::type action_type;
-        typedef 
-            typename hpx::actions::extract_action<action_type>::result_type
-            result_type;
-        typedef hpx::actions::base_lco_continuation<result_type> rc_type;
-        vector<rc_type*> continuations;
-
-        //measures creation time of continuations
-        apply_create_continuations<Vector, vector<rc_type*>, result_type>
-            (packages, continuations, num, ot);
-
-        //finally apply the continuations directly
-        high_resolution_timer tt;
-        for(i = 0; i < num; i++) 
-            hpx::apply<action_type>(lid, a1);
-        mean = tt.elapsed()/num;
-        time.reserve(num);
-        message = "Measuring time required to apply continuations directly:";
-
-        for(i = 0; i < num; i++){
-            high_resolution_timer t1;
-            hpx::apply<action_type>(lid, a1);
-            time.push_back(t1.elapsed());
-        }
-        printout(time, ot, mean, message);
-    }
-    else{
-        //next test applies actions directly, skipping get_gid stage
-        high_resolution_timer tt;
-        for(i = 0; i < num; ++i)
-            hpx::apply<Action>(lid, a1);
-        mean = tt.elapsed()/num;
-        time.reserve(num);
-        message = "Measuring time required to apply actions directly:";
-        for(i = 0; i < num; i++){
-            high_resolution_timer t1;
-            hpx::apply<Action>(lid, a1);
-            time.push_back(t1.elapsed());
-        }
-        printout(time, ot, mean, message);
-    }*/
 }
 template <typename Vector, typename Package, typename Action, typename T>
 void run_tests(bool empty, uint64_t num, T a1, T a2){
@@ -422,53 +312,6 @@ void run_tests(bool empty, uint64_t num, T a1, T a2){
               "packaged_action.apply():";
     printout(time, ot, mean, message);
     time.clear();
-
-    //now we begin measuring the individual components
-/*    packages.clear();
-    create_packages<Vector, Package>(packages, num);
-
-    if(empty){
-        typedef typename hpx::actions::extract_action<Action>::type action_type;
-        typedef 
-            typename hpx::actions::extract_action<action_type>::result_type
-            result_type;
-        typedef hpx::actions::base_lco_continuation<result_type> rc_type;
-        vector<rc_type*> continuations;
-
-        //measures creation time of continuations
-        apply_create_continuations<Vector, vector<rc_type*>, result_type>
-            (packages, continuations, num, ot);
-
-        //finally apply the continuations directly
-        high_resolution_timer tt;
-        for(i = 0; i < num; i++) 
-            hpx::apply<action_type>(lid, a1, a2);
-        mean = tt.elapsed()/num;
-        time.reserve(num);
-        message = "Measuring time required to apply continuations directly:";
-
-        for(i = 0; i < num; i++){
-            high_resolution_timer t1;
-            hpx::apply<action_type>(lid, a1, a2);
-            time.push_back(t1.elapsed());
-        }
-        printout(time, ot, mean, message);
-    }
-    else{
-        //next test applies actions directly, skipping get_gid stage
-        high_resolution_timer tt;
-        for(i = 0; i < num; ++i)
-            hpx::apply<Action>(lid, a1, a2);
-        mean = tt.elapsed()/num;
-        time.reserve(num);
-        message = "Measuring time required to apply actions directly:";
-        for(i = 0; i < num; i++){
-            high_resolution_timer t1;
-            hpx::apply<Action>(lid, a1, a2);
-            time.push_back(t1.elapsed());
-        }
-        printout(time, ot, mean, message);
-    }*/
 }
 template <typename Vector, typename Package, typename Action, typename T>
 void run_tests(bool empty, uint64_t num, T a1, T a2, T a3){
@@ -495,53 +338,6 @@ void run_tests(bool empty, uint64_t num, T a1, T a2, T a3){
               "packaged_action.apply():";
     printout(time, ot, mean, message);
     time.clear();
-
-    //now we begin measuring the individual components
-/*    packages.clear();
-    create_packages<Vector, Package>(packages, num);
-
-    if(empty){
-        typedef typename hpx::actions::extract_action<Action>::type action_type;
-        typedef 
-            typename hpx::actions::extract_action<action_type>::result_type
-            result_type;
-        typedef hpx::actions::base_lco_continuation<result_type> rc_type;
-        vector<rc_type*> continuations;
-
-        //measures creation time of continuations
-        apply_create_continuations<Vector, vector<rc_type*>, result_type>
-            (packages, continuations, num, ot);
-
-        //finally apply the continuations directly
-        high_resolution_timer tt;
-        for(i = 0; i < num; i++) 
-            hpx::apply<action_type>(lid, a1, a2, a3);
-        mean = tt.elapsed()/num;
-        time.reserve(num);
-        message = "Measuring time required to apply continuations directly:";
-
-        for(i = 0; i < num; i++){
-            high_resolution_timer t1;
-            hpx::apply<action_type>(lid, a1, a2, a3);
-            time.push_back(t1.elapsed());
-        }
-        printout(time, ot, mean, message);
-    }
-    else{
-        //next test applies actions directly, skipping get_gid stage
-        high_resolution_timer tt;
-        for(i = 0; i < num; ++i)
-            hpx::apply<Action>(lid, a1, a2, a3);
-        mean = tt.elapsed()/num;
-        time.reserve(num);
-        message = "Measuring time required to apply actions directly:";
-        for(i = 0; i < num; i++){
-            high_resolution_timer t1;
-            hpx::apply<Action>(lid, a1, a2, a3);
-            time.push_back(t1.elapsed());
-        }
-        printout(time, ot, mean, message);
-    }*/
 }
 template <typename Vector, typename Package, typename Action, typename T>
 void run_tests(bool empty, uint64_t num, T a1, T a2, T a3, T a4){
@@ -568,51 +364,4 @@ void run_tests(bool empty, uint64_t num, T a1, T a2, T a3, T a4){
               "packaged_action.apply():";
     printout(time, ot, mean, message);
     time.clear();
-
-    //now we begin measuring the individual components
-/*    packages.clear();
-    create_packages<Vector, Package>(packages, num);
-
-    if(empty){
-        typedef typename hpx::actions::extract_action<Action>::type action_type;
-        typedef 
-            typename hpx::actions::extract_action<action_type>::result_type
-            result_type;
-        typedef hpx::actions::base_lco_continuation<result_type> rc_type;
-        vector<rc_type*> continuations;
-
-        //measures creation time of continuations
-        apply_create_continuations<Vector, vector<rc_type*>, result_type>
-            (packages, continuations, num, ot);
-
-        //finally apply the continuations directly
-        high_resolution_timer tt;
-        for(i = 0; i < num; i++) 
-            hpx::apply<action_type>(lid, a1, a2, a3, a4);
-        mean = tt.elapsed()/num;
-        time.reserve(num);
-        message = "Measuring time required to apply continuations directly:";
-
-        for(i = 0; i < num; i++){
-            high_resolution_timer t1;
-            hpx::apply<action_type>(lid, a1, a2, a3, a4);
-            time.push_back(t1.elapsed());
-        }
-        printout(time, ot, mean, message);
-    }
-    else{
-        //next test applies actions directly, skipping get_gid stage
-        high_resolution_timer tt;
-        for(i = 0; i < num; ++i)
-            hpx::apply<Action>(lid, a1, a2, a3, a4);
-        mean = tt.elapsed()/num;
-        time.reserve(num);
-        message = "Measuring time required to apply actions directly:";
-        for(i = 0; i < num; i++){
-            high_resolution_timer t1;
-            hpx::apply<Action>(lid, a1, a2, a3, a4);
-            time.push_back(t1.elapsed());
-        }
-        printout(time, ot, mean, message);
-    }*/
 }

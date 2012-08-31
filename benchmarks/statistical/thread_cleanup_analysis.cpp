@@ -65,10 +65,11 @@ void register_work(Vector packages, uint64_t num, double ot){
     error_code ec = hpx::throws;
 
     high_resolution_timer t;
-    for(; i < num; ++i) base.register_thread(data, state, true, ec);
+//    for(; i < num; ++i) base.register_thread(data, state, true, ec);
     mean = t.elapsed()/num;
     for(i = 0; i < num; i++){
         high_resolution_timer t1;
+        printf("registering %ld\n",i);
         base.register_thread(data, state, true, ec);
         time.push_back(t1.elapsed());
     }

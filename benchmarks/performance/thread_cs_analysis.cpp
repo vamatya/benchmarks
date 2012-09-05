@@ -3,6 +3,8 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
+/*This benchmark attempts to measure the overhead involved in context switching
+between hpx threads.*/
 #include <hpx/include/threadmanager.hpp>
 #include <hpx/util/lightweight_test.hpp>
 #include <boost/lexical_cast.hpp>
@@ -21,6 +23,7 @@ using boost::program_options::options_description;
 using boost::uint64_t;
 using hpx::util::high_resolution_timer;
 
+//simply a function which will run for a long time
 void loop_function(uint64_t iters){
     volatile double bigcount = iters;
     for(uint64_t i = 0; i < iters; i++){
@@ -31,6 +34,8 @@ void loop_function(uint64_t iters){
     }
 }
 
+//this function runs for a long time but suspends itself regularly, which
+//forces a context switch
 void loop_function2(uint64_t iters){
     volatile double bigcount = iters;
     for(uint64_t i = 0; i < iters; i++){
@@ -49,6 +54,7 @@ void run_tests(uint64_t, int, int);
 ///////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////////////////////////////////////////////
+//required to run hpx
 int hpx_main(variables_map& vm){
     uint64_t num = vm["iterations"].as<uint64_t>();
     int threads = vm["hpx-threads"].as<int>();
@@ -85,12 +91,11 @@ void run_tests(uint64_t num, int threads, int os){
     double time1, time2;
     int i;
     std::vector<hpx::thread> funcs;
-    //first measure how long it takes to spawn threads
-    //then measure how long it takes to join them back together
-    printf("\nNOTE: for now, this benchmark is only intended to obtain the \n"
-           "        percentage of total runtime spent on context switching when\n"
+
+    printf("\nNOTE: for now, this benchmark is only intended for the case where \n"
            "        the number of OS threads is <= the number of cores available.\n\n");
 
+    //measure the amount of time loop_function runs for without context switching
     high_resolution_timer t;
     loop_function(num);
     time1 = t.elapsed();
@@ -99,15 +104,24 @@ void run_tests(uint64_t num, int threads, int os){
         "%f s\n", time1);
 
     t.restart();
+
+    //create multiple threads running loop_function2, with context switching
     for(i = 0; i < threads; ++i)
         funcs.push_back(hpx::thread(&loop_function2, num));
+
+    //wait for these threads to complete
     for(i = 0; i < threads; ++i)
         funcs[i].join();
+
+    //obtain the effective time of loop_function2, which should be the
+    //time of loop_function + the overhead of context switching
     time2 = t.elapsed()*std::min(threads,os)/threads;
 
     printf("Executing the function %d times simultaneously on %d cores yields "
         "an average time of %f s\n\n", threads, os, time2);
 
+    //we know the approximate number of context switches because we force them
+    //to occur manually at every 10000 iterations of the loop
     printf("Total number of context switches per thread is approximately %ld\n",
         num/10000);
     printf("Estimated time spent context switching is %f s\n", time2-time1);

@@ -3,6 +3,10 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
+/*This benchmark attempts to measure the amount of time required to send a
+parcel from one component to another.  This does not measure the latency between
+sending the parcel and the arrival of the parcel, it only measures the overhead
+of actually sending the parcel for the thread sending the parcel.*/
 #include "parcelsender/sender.hpp"
 #include "parcelreceiver/receiver.hpp"
 
@@ -13,6 +17,7 @@ typedef hpx::lcos::future<bool> bf;
 
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
+//required to run hpx
 int hpx_main(variables_map& vm){
     uint64_t num = vm["number-sent"].as<uint64_t>();
     csv = (vm.count("csv") ? true : false);
@@ -23,20 +28,30 @@ int hpx_main(variables_map& vm){
     sendid = (hpx::applier::get_applier().get_runtime_support_gid());
     receiveid = hpx::applier::get_applier().get_runtime_support_gid();
 
+    //declare a sending and receiving component
     parcelsender sender(num, ot, sendid, receiveid);
     parcelreceiver receiver(num, ot);
 
+    //asynchronously begin sending all parcels
     bf sent = hpx::async<
         hpx::components::server::parcelsender::send_all_action>(sender.get_gid());
     
+    //if the "simultaneous" parameter is set, make sure all parcels are sent
+    //before any are received by calling sent.get()
     if(!vm.count("simultaneous")) sent.get();
     
+    //asynchronously begin receiving all parcels
     bf received = hpx::async<
         hpx::components::server::parcelreceiver::receive_all_action>(
         receiver.get_gid());
 
+    //wait until all parcels have been sent. This is only necessary because this
+    //also waits for the results of the sending measurements to be calculated
+    //and printed.  Otherwise simply waiting for all parcels to be received
+    //(which is done below) would be sufficient for program safety
     if(vm.count("simultaneous")) sent.get();
 
+    //wait for all parcels to be received
     received.get();
 
     return hpx::finalize();

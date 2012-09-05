@@ -3,12 +3,14 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
+/*This benchmark measures how long it takes to spawn new threads directly*/
 #include "statstd.hpp"
 #include <hpx/include/threadmanager.hpp>
 #include <hpx/util/lightweight_test.hpp>
 #include <boost/assign/std/vector.hpp>
 #include <boost/lexical_cast.hpp>
 
+//just an empty function to assign to the thread
 void void_thread(){
 }
 
@@ -21,6 +23,7 @@ void run_tests(uint64_t);
 ///////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////////////////////////////////////////////
+//still required to run hpx
 int hpx_main(variables_map& vm){
     uint64_t num = vm["number-spawned"].as<uint64_t>();
     csv = (vm.count("csv") ? true : false);
@@ -60,19 +63,24 @@ void run_tests(uint64_t num){
     vector<hpx::thread> threads;
     threads.reserve(2*num);
 
-    //first measure how long it takes to spawn threads
-    //then measure how long it takes to join them back together
+    //first measure the average time it takes to spawn threads
     high_resolution_timer t;
     for(; i < num; ++i)
         threads.push_back(hpx::thread(&void_thread));
     mean1 = t.elapsed()/num;
+
+    //now retrieve the statistical sampling of this time
     time.reserve(num);
     for(i = 0; i < num; i++){
         high_resolution_timer t1;
         threads.push_back(hpx::thread(&void_thread));
         time.push_back(t1.elapsed());
     }
+
     printout(time, ot, mean1, message);
+
+    //ensure all created threads have joined or else we will not be able to safely
+    //exit the program
     for(i = 0; i < num; ++i) threads[i].join();
     for(i = num; i < num+num; ++i) threads[i].join();
 }

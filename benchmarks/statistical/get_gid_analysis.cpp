@@ -3,8 +3,12 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
+/*This benchmark simply measures how much time is required to retrieve the
+gid (global id) of an object in memory. Specifically, that object is
+a packaged_action*/
 #include "statstd.hpp"
 
+//empty function for the packaged action
 void void_thread(){
 }
 
@@ -14,6 +18,7 @@ HPX_REGISTER_PLAIN_ACTION(void_action0);
 
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
+//simply creates the packaged actions
 template <typename Vector, typename Package>
 void create_packages(Vector& packages, uint64_t num){
     uint64_t i = 0;
@@ -41,10 +46,12 @@ void test_get_gid(Vector packages, uint64_t num, double ot){
     vector<double> time;
     time.reserve(num);
 
+    //here measures the mean time
     high_resolution_timer t;
     for(; i < num; ++i)
         packages[i]->get_gid();
     mean = t.elapsed()/num;
+    //here we retrieve large numbers of measurements for statistical analysis
     for(i = 0; i < num; i++){
         high_resolution_timer t1;
         packages[i]->get_gid();
@@ -53,28 +60,8 @@ void test_get_gid(Vector packages, uint64_t num, double ot){
     printout(time, ot, mean, message);
 }
 
-//measure how long it takes to run get_base_gid()
-/*template <typename Vector>
-void test_get_base_gid(Vector packages, uint64_t num, double ot){
-    uint64_t i = 0;
-    double mean;
-    string message = "Measuring total time required to get base gids:";
-    vector<double> time;
-    time.reserve(num);
-
-    high_resolution_timer t;
-    for(; i < num; i++)
-        packages[i]->get_base_gid();
-    mean = t.elapsed()/num;
-    for(i = 0; i < num; i++){
-        high_resolution_timer t1;
-        packages[i]->get_base_gid();
-        time.push_back(t1.elapsed());
-    }
-    printout(time, ot, mean, message);
-}*/
-
 ///////////////////////////////////////////////////////////////////////////////
+//required to run hpx
 int hpx_main(variables_map& vm){
     uint64_t num = vm["number-created"].as<uint64_t>();
     csv = (vm.count("csv") ? true : false);

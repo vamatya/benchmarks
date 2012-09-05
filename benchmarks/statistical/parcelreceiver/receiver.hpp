@@ -3,6 +3,10 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
+/*This is the core of the parcelreceiver component source code, however without
+the proper code base (server/stubs/main .hpp files) it cannot be properly treated
+as a component.  Fortunately its functionality is sufficient for the purposes of
+this benchmark*/
 #include <hpx/hpx.hpp>
 #include <hpx/hpx_fwd.hpp>
 #include <hpx/runtime/applier/applier.hpp>
@@ -20,48 +24,26 @@ namespace hpx { namespace components { namespace server
 using hpx::applier::get_applier;
 using hpx::parcelset::parcel;
 
+//declare the component
 class HPX_COMPONENT_EXPORT parcelreceiver : 
     public simple_component_base<parcelreceiver>
 {
 public:
     parcelreceiver(){}
-    parcelreceiver(uint64_t num, double ot_):number(num), ot(ot_){
-    }
+    parcelreceiver(uint64_t num, double ot_):number(num), ot(ot_){}
 
+    //This function simply receives all of the parcels which were sent by the
+    //parcelsender component's function send_all()
     bool receive_all(){
         uint64_t i = 0;
-//        double mean1;
-//        double mean2;
-//        string message = "Measuring time required to get parcels from queue:";
-//        vector<double> time;
-//        time.reserve(number);
         parcel p;
         hpx::parcelset::parcelhandler& ph = get_applier().get_parcel_handler();
 
-//        high_resolution_timer t;
         for(; i < number; ++i)
             ph.get_parcel(p);
-//        mean1 = t.elapsed()/number;
-/*
-        t.restart();
-        for(i = 0; i < number; ++i){}
-        mean2 = t.elapsed()/number;
-*/
         for(i = 0; i < number; i++){
-//            high_resolution_timer t1;
             ph.get_parcel(p);
-//            time.push_back(t1.elapsed());
         }
-//        printout(time, ot, mean1, message);
-/*
-        message = "Measuring time required to process parcels:";
-        for(i = 0; i < number; i++){
-            high_resolution_timer t1;
-            //packages[i]->get_gid();
-            time.push_back(t1.elapsed());
-        }
-        printout(time, ot, mean2, message);
-*/
         return true;
     }
 

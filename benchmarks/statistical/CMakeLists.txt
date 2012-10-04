@@ -44,7 +44,7 @@ set(benchmarks
    )
 
 #set(create_comps_analysis_FLAGS DEPENDENCIES iostreams empty)
-set(create_parcels_analysis_FLAGS DEPENDENCIES iostreams)
+#set(create_parcels_analysis_FLAGS COMPONENT_DEPENDENCIES iostreams)
 #set(free_comps_analysis_FLAGS DEPENDENCIES iostreams empty)
 set(general_apply_analysis_FLAGS DEPENDENCIES iostreams)
 set(general_apply_dir_analysis_FLAGS DEPENDENCIES iostreams)
@@ -73,6 +73,7 @@ foreach(benchmark ${benchmarks})
   add_hpx_executable(${benchmark}
                      SOURCES ${sources}
                      ${${benchmark}_FLAGS}
+                     COMPONENT_DEPENDENCIES iostreams
                      FOLDER "Benchmarks/Statistical/${benchmark}")
 
   # add a custom target for this example

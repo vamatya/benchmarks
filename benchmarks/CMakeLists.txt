@@ -5,9 +5,7 @@
 
 set(subdirs
     performance
-    regressions
     statistical
-    unit
     )
 
 foreach(subdir ${subdirs})

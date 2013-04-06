@@ -5,8 +5,8 @@
 # file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
 set(benchmarks
-   osu_bw
-   )
+    osu_bibw
+    osu_bw)
 
 foreach(benchmark ${benchmarks})
   set(sources

@@ -3,7 +3,7 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-// Unidirectional network bandwidth test
+// Bidirectional network bandwidth test
 
 #include <hpx/hpx_main.hpp>
 #include <hpx/hpx.hpp>
@@ -12,21 +12,6 @@
 
 #include <boost/assert.hpp>
 #include <boost/shared_ptr.hpp>
-
-///////////////////////////////////////////////////////////////////////////////
-char* align_buffer (char* ptr, unsigned long align_size)
-{
-    return (char*)(((std::size_t)ptr + (align_size - 1)) / align_size * align_size);
-}
-
-#if defined(BOOST_MSVC)
-unsigned long getpagesize()
-{
-    SYSTEM_INFO si;
-    GetSystemInfo(&si);
-    return si.dwPageSize;
-}
-#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 #define LOOP_SMALL  100
@@ -44,6 +29,21 @@ unsigned long getpagesize()
 #define SEND_BUFSIZE (MAX_MSG_SIZE + MAX_ALIGNMENT)
 
 char send_buffer[SEND_BUFSIZE];
+
+///////////////////////////////////////////////////////////////////////////////
+char* align_buffer (char* ptr, unsigned long align_size)
+{
+    return (char*)(((std::size_t)ptr + (align_size - 1)) / align_size * align_size);
+}
+
+#if defined(BOOST_MSVC)
+unsigned long getpagesize()
+{
+    SYSTEM_INFO si;
+    GetSystemInfo(&si);
+    return si.dwPageSize;
+}
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 void isend(hpx::util::serialize_buffer<char> const& receive_buffer) {}
@@ -99,11 +99,12 @@ HPX_PLAIN_ACTION(ireceive);
 ///////////////////////////////////////////////////////////////////////////////
 void print_header ()
 {
-    hpx::cout << "# OSU HPX Bandwidth Test\n"
+    hpx::cout << "# OSU HPX Bi-Directional Test\n"
               << "# Size    Bandwidth (MB/s)\n"
               << hpx::flush;
 }
 
+///////////////////////////////////////////////////////////////////////////////
 void run_benchmark()
 {
     // use the first remote locality to bounce messages, if possible
@@ -118,7 +119,13 @@ void run_benchmark()
     ireceive_action receive;
     for (std::size_t size = 1; size <= MAX_MSG_SIZE; size *= 2)
     {
-        double bw = receive(here, there, size);
+        hpx::future<double> receive_there = hpx::async(receive, there, here, size);
+        hpx::future<double> receive_here = hpx::async(receive, here, there, size);
+
+        std::vector<hpx::future<double> > band_widths =
+            hpx::wait_all(receive_there, receive_here);
+
+        double bw = band_widths[0].get() + band_widths[1].get();
         hpx::cout << std::left << std::setw(10) << size << bw << hpx::endl << hpx::flush;
     }
 }

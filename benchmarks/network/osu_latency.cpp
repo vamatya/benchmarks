@@ -14,13 +14,11 @@
 #include <boost/shared_ptr.hpp>
 
 ///////////////////////////////////////////////////////////////////////////////
-#define LOOP_SMALL  100
-#define WINDOW_SIZE_SMALL  64
-#define SKIP_SMALL  10
+#define LOOP_SMALL  10000
+#define SKIP_SMALL  1000
 
-#define LOOP_LARGE  20
-#define WINDOW_SIZE_LARGE  64
-#define SKIP_LARGE  2
+#define LOOP_LARGE  100
+#define SKIP_LARGE  10
 
 #define LARGE_MESSAGE_SIZE  8192
 
@@ -46,7 +44,11 @@ unsigned long getpagesize()
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////
-void isend(hpx::util::serialize_buffer<char> const& receive_buffer) {}
+hpx::util::serialize_buffer<char>
+isend(hpx::util::serialize_buffer<char> const& receive_buffer)
+{
+    return receive_buffer;
+}
 HPX_PLAIN_ACTION(isend);
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -54,12 +56,10 @@ double ireceive(hpx::naming::id_type dest, std::size_t size)
 {
     int loop = LOOP_SMALL;
     int skip = SKIP_SMALL;
-    int window_size = WINDOW_SIZE_SMALL;
 
     if (size > LARGE_MESSAGE_SIZE) {
         loop = LOOP_LARGE;
         skip = SKIP_LARGE;
-        window_size = WINDOW_SIZE_LARGE;
     }
 
     // align used buffers on page boundaries
@@ -70,37 +70,28 @@ double ireceive(hpx::naming::id_type dest, std::size_t size)
     std::memset(aligned_send_buffer, 'a', size);
 
     hpx::util::high_resolution_timer t;
+
+    isend_action send;
     for (int i = 0; i != loop + skip; ++i) {
         // do not measure warm up phase
         if (i == skip)
             t.restart();
 
-        std::vector<hpx::future<void> > lazy_results;
-        lazy_results.reserve(window_size);
-
-        isend_action send;
-        for (int j = 0; j < window_size; ++j)
-        {
-            typedef hpx::util::serialize_buffer<char> buffer_type;
-
-            // Note: The original benchmark uses MPI_Isend which does not
-            //       create a copy of the passed buffer.
-            lazy_results.push_back(hpx::async(send, dest,
-                buffer_type(aligned_send_buffer, size, buffer_type::reference)));
-        }
-        hpx::wait_all(lazy_results);
+        typedef hpx::util::serialize_buffer<char> buffer_type;
+        send(dest, buffer_type(aligned_send_buffer, size,
+            buffer_type::reference));
     }
 
     double elapsed = t.elapsed();
-    return (size / 1e6 * loop * window_size) / elapsed;
+    return (elapsed * 1e6) / (2 * loop);
 }
 HPX_PLAIN_ACTION(ireceive);
 
 ///////////////////////////////////////////////////////////////////////////////
 void print_header ()
 {
-    hpx::cout << "# OSU HPX Bi-Directional Test\n"
-              << "# Size    Bandwidth (MB/s)\n"
+    hpx::cout << "# OSU HPX Latency Test\n"
+              << "# Size    Bandwidth (microsec)\n"
               << hpx::flush;
 }
 
@@ -119,15 +110,9 @@ void run_benchmark()
     ireceive_action receive;
     for (std::size_t size = 1; size <= MAX_MSG_SIZE; size *= 2)
     {
-        hpx::future<double> receive_there = hpx::async(receive, there, here, size);
-        hpx::future<double> receive_here = hpx::async(receive, here, there, size);
-
-        std::vector<hpx::future<double> > band_widths =
-            hpx::wait_all(receive_there, receive_here);
-
-        double bw = band_widths[0].get() + band_widths[1].get();
+        double latency = receive(there, here, size);
         hpx::cout << std::left << std::setw(10) << size
-                  << bw << hpx::endl << hpx::flush;
+                  << latency << hpx::endl << hpx::flush;
     }
 }
 

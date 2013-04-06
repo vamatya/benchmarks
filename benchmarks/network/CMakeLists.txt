@@ -6,7 +6,8 @@
 
 set(benchmarks
     osu_bibw
-    osu_bw)
+    osu_bw
+    osu_latency)
 
 foreach(benchmark ${benchmarks})
   set(sources

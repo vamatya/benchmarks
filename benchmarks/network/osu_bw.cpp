@@ -119,7 +119,8 @@ void run_benchmark()
     for (std::size_t size = 1; size <= MAX_MSG_SIZE; size *= 2)
     {
         double bw = receive(here, there, size);
-        hpx::cout << std::left << std::setw(10) << size << bw << hpx::endl << hpx::flush;
+        hpx::cout << std::left << std::setw(10) << size
+                  << bw << hpx::endl << hpx::flush;
     }
 }
 

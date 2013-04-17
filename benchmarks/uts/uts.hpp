@@ -27,7 +27,6 @@ inline double rng_toProb(int n) {
 }
 
 struct node
-    : boost::noncopyable
 {
     enum tree_type {
         BIN = 0,
@@ -82,6 +81,15 @@ struct node
     int num_children;
 
     state_t state;
+
+    template <typename Archive>
+    void serialize(Archive & ar, unsigned)
+    {
+        ar & type;
+        ar & height;
+        ar & num_children;
+        ar & state.state;
+    }
 
     template <typename Params>
     void init_root(Params const & p)
@@ -304,13 +312,20 @@ inline std::istream & operator>>(std::istream & is, node::geoshape & type)
 
 struct stealstack_node
 {
+    stealstack_node()
+    {}
+
     stealstack_node(std::size_t size)
     {
         work.reserve(size);
     }
 
-    boost::uint32_t owner_id;
-    boost::uint32_t parent_id;
+    template <typename Archive>
+    void serialize(Archive & ar, unsigned)
+    {
+        ar & work;
+    }
+
     std::vector<node> work;
 };
 

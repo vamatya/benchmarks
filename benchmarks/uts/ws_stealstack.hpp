@@ -72,8 +72,7 @@ namespace components
         };
 
         ws_stealstack()
-          : global_work(0)
-          , local_work(0)
+          : local_work(0)
           , walltime(0)
           , work_time(0)
           , search_time(0)
@@ -89,6 +88,9 @@ namespace components
           , pollint_adaptive(false)
         {
         }
+
+        typedef hpx::lcos::local::spinlock mutex_type;
+        mutex_type local_queue_mtx;
 
         void init_symbolic_names()
         {
@@ -144,30 +146,34 @@ namespace components
 
         void put_work(node const & n)
         {
-            /* If the stack is empty, push an empty stealstack_node. */
-            if(local_queue.empty())
             {
-                stealstack_node node(param.chunk_size);
-                local_queue.push_front(node);
-            }
+                mutex_type::scoped_lock lk(local_queue_mtx);
+                /* If the stack is empty, push an empty stealstack_node. */
+                if(local_queue.empty())
+                {
+                    stealstack_node node(param.chunk_size);
+                    local_queue.push_front(node);
+                }
 
 
-            /* If the current stealstack_node is full, push a new one. */
-            if(local_queue.front().work.size() == param.chunk_size)
-            {
-                stealstack_node node(param.chunk_size);
-                local_queue.push_front(node);
-            }
-            else if (local_queue.front().work.size() > param.chunk_size)
-            {
-                throw std::logic_error("ss_put_work(): Block has overflowed!");
-            }
-            
-            stealstack_node & node = local_queue.front();
+                /* If the current stealstack_node is full, push a new one. */
+                if(local_queue.front().work.size() == param.chunk_size)
+                {
+                    stealstack_node node(param.chunk_size);
+                    local_queue.push_front(node);
+                }
+                else if (local_queue.front().work.size() > param.chunk_size)
+                {
+                    throw std::logic_error("ss_put_work(): Block has overflowed!");
+                }
+                
+                stealstack_node & node = local_queue.front();
 
-            node.work.push_back(n);
+                node.work.push_back(n);
+            }
             local_work++;
-            stat.max_stack_depth = std::max(local_work, stat.max_stack_depth);
+            int local_work_tmp = local_work;
+            stat.max_stack_depth = std::max(local_work_tmp, stat.max_stack_depth);
         }
 
         void gen_children(node & parent)
@@ -202,6 +208,29 @@ namespace components
                 ++stat.n_leaves;
             }
         }
+        
+        std::pair<bool, stealstack_node> steal_work()
+        {
+            std::pair<bool, stealstack_node> res = std::make_pair(false, stealstack_node(param.chunk_size));
+
+            {
+                mutex_type::scoped_lock lk(local_queue_mtx);
+                if(local_queue.size() > 2)
+                {
+                    res.second = local_queue.back();
+                    local_queue.pop_back();
+                }
+                local_work -= res.second.work.size();
+            }
+            if(local_work > 0)
+            {
+                res.first = true;
+            }
+
+            return res;
+        }
+
+        HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, steal_work);
 
         bool ensure_local_work()
         {
@@ -210,54 +239,76 @@ namespace components
                 throw std::logic_error("ensure_local_work(): local_work count is less than 0!");
             }
 
-            if(local_work == 0)
+            while(local_work == 0)
             {
-                return false;
+                bool terminate = true;
+                for(std::size_t i = 0; i < size -1; ++i)
+                {
+                    last_steal = (last_steal + 1) % size;
+                    if(last_steal == rank) last_steal = (last_steal + 1) % size;
+
+                    ws_stealstack::steal_work_action act;
+                    std::pair<bool, stealstack_node> node_pair(act(ids[last_steal]));
+
+                    if(node_pair.second.work.size() > 0)
+                    {
+                        mutex_type::scoped_lock lk(local_queue_mtx);
+                        terminate = false;
+
+                        local_queue.push_back(node_pair.second);
+                        local_work += node_pair.second.work.size();
+                        break;
+                    }
+                    if(node_pair.first)
+                    {
+                        terminate = false;
+                    }
+                }
+
+                if(terminate) return false;
             }
 
             return true;
         }
 
-        bool get_work(node & n)
+        bool get_work(std::vector<node> & work)
         {
             if(!ensure_local_work())
             {
                 return false;
             }
 
-            stealstack_node & node = local_queue.front();
-
-            if(node.work.size() > 0)
             {
-                n = node.work.back();
-                node.work.pop_back();
+                mutex_type::scoped_lock lk(local_queue_mtx);
+                std::swap(work, local_queue.front().work);
+                local_queue.pop_front();
             }
-            else
+
+            stat.n_nodes += work.size();
+            local_work -= work.size();
+
+            if(work.size() == 0)
             {
-                hpx::cout << "get_work(): called with node.work.size() = 0, "
+                hpx::cout << "get_work(): called with work.size() = 0, "
                     << "local_work=" << local_work
                     << " or " << (local_work % param.chunk_size)
                     << " (mod " << param.chunk_size << ")\n" << hpx::flush;
                 throw std::logic_error("get_work(): Underflow!");
             }
 
-            if(node.work.size() == 0)
-            {
-                local_queue.pop_front();
-            }
-
-            ++stat.n_nodes;
-            --local_work;
-
             return true;
         }
 
         void tree_search()
         {
-            node parent;
-            while(get_work(parent))
+            std::vector<node> parents;
+            while(get_work(parents))
             {
-                gen_children(parent);
+                BOOST_FOREACH(node & parent, parents)
+                {
+                    gen_children(parent);
+                }
+                parents.clear();
             }
         }
         
@@ -273,8 +324,7 @@ namespace components
         private:
             std::vector<std::string> names;
             std::vector<hpx::id_type> ids;
-            int global_work;
-            int local_work;
+            boost::atomic<int> local_work;
 
             stats stat;
 

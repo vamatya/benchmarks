@@ -19,7 +19,8 @@
 #define MAX_NUM_CHILDREN    100  // cap on children (BIN root is exempt)
 
 // Interpret 32 bit positive integer as value on [0,1)
-inline double rng_toProb(int n) {
+inline double rng_toProb(int n) 
+{
   if (n < 0) {
       hpx::cout << "*** toProb: rand n = " << n << " out of range\n" << hpx::flush;
   }
@@ -77,7 +78,7 @@ struct node
     }
 
     int type;
-    int height;
+    std::size_t height;
     int num_children;
 
     state_t state;
@@ -101,7 +102,8 @@ struct node
 
         if(p.debug & 1)
         {
-            hpx::cout << "root node of type " << p.type << " at " << std::hex << this << std::dec << "\n" << hpx::flush;
+            hpx::cout << "root node of type " << p.type 
+                << " at " << std::hex << this << std::dec << "\n" << hpx::flush;
         }
     }
 
@@ -117,7 +119,7 @@ struct node
             case HYBRID:
               if (height < p.shift_depth * p.gen_mx)
                 return GEO;
-              else 
+              else
                 return BIN;
             case BALANCED:
               return BALANCED;
@@ -132,7 +134,7 @@ struct node
     {
         int v = rng_rand(state.state);
         double d = rng_toProb(v);
-        
+
         return (d < p.non_leaf_prob) ? p.non_leaf_bf : 0;
     }
 
@@ -140,16 +142,17 @@ struct node
     int get_num_children_geo(Params const & p)
     {
         double b_i = p.b_0;
-        int depth = height;
-    
+        std::size_t depth = height;
+
         // use shape function to compute target b_i
-        if(depth > 0)
+        if(depth != 0)
         {
             switch(p.shape_fn)
             {
                 // expected size polynomial in depth
                 case EXPDEC:
-                    b_i = p.b_0 * std::pow((double)depth, -std::log(p.b_0)/std::log((double)p.gen_mx));
+                    b_i = p.b_0 * std::pow(
+                        (double)depth, -std::log(p.b_0)/std::log((double)p.gen_mx));
                     break;
                 // cyclic tree size
                 case CYCLIC:
@@ -158,7 +161,8 @@ struct node
                         b_i = 0.0;
                         break;
                     }
-                    b_i = std::pow(p.b_0, std::sin(2.0 * 3.141592653589793*(double)depth / (double)p.gen_mx));
+                    b_i = std::pow(p.b_0,
+                        std::sin(2.0 * 3.141592653589793*(double)depth / (double)p.gen_mx));
                     break;
                 case FIXED:
                     b_i = (depth < p.gen_mx) ? p.b_0 : 0;
@@ -169,18 +173,18 @@ struct node
                     break;
             }
         }
-        
-        // given target b_i, find prob p so expected value of 
+
+        // given target b_i, find prob p so expected value of
         // geometric distribution is b_i.
         double prob = 1.0 / (1.0 + b_i);
-        
+
         // get uniform random number on [0,1)
         int h = rng_rand(state.state);
         double u = rng_toProb(h);
-        
+
         // max number of children at this cumulative probability
         // (from inverse geometric cumulative density function)
-        return (int) std::floor(std::log(1.0 - u) / std::log(1.0 - prob)); 
+        return (int) std::floor(std::log(1.0 - u) / std::log(1.0 - prob));
     }
 
     template <typename Params>
@@ -229,7 +233,8 @@ struct node
             int root_BF = (int)std::ceil(p.b_0);
             if(num > root_BF)
             {
-                hpx::cout << "*** Number of children of root truncated from " << num << " to " << root_BF << "\n" << hpx::flush;
+                hpx::cout << "*** Number of children of root truncated from "
+                    << num << " to " << root_BF << "\n" << hpx::flush;
                 num = root_BF;
             }
         }
@@ -237,7 +242,8 @@ struct node
         {
             if (num > MAX_NUM_CHILDREN)
             {
-                hpx::cout << "*** Number of children truncated from " << num << " to " << MAX_NUM_CHILDREN << "\n" << hpx::flush;
+                hpx::cout << "*** Number of children truncated from "
+                    << num << " to " << MAX_NUM_CHILDREN << "\n" << hpx::flush;
                 num = MAX_NUM_CHILDREN;
             }
         }
@@ -259,20 +265,20 @@ inline std::istream & operator>>(std::istream & is, node::tree_type & type)
     is >> i;
     switch (i)
     {
-        case node::tree_type::BIN:
-            type = node::tree_type::BIN;
+        case node::BIN:
+            type = node::BIN;
             break;
-        case node::tree_type::GEO:
-            type = node::tree_type::GEO;
+        case node::GEO:
+            type = node::GEO;
             break;
-        case node::tree_type::HYBRID:
-            type = node::tree_type::HYBRID;
+        case node::HYBRID:
+            type = node::HYBRID;
             break;
-        case node::tree_type::BALANCED:
-            type = node::tree_type::BALANCED;
+        case node::BALANCED:
+            type = node::BALANCED;
             break;
         default:
-            type = node::tree_type::BIN;
+            type = node::BIN;
             break;
     }
     return is;
@@ -291,20 +297,20 @@ inline std::istream & operator>>(std::istream & is, node::geoshape & type)
     is >> i;
     switch (i)
     {
-        case node::geoshape::LINEAR:
-            type = node::geoshape::LINEAR;
+        case node::LINEAR:
+            type = node::LINEAR;
             break;
-        case node::geoshape::EXPDEC:
-            type = node::geoshape::EXPDEC;
+        case node::EXPDEC:
+            type = node::EXPDEC;
             break;
-        case node::geoshape::CYCLIC:
-            type = node::geoshape::CYCLIC;
+        case node::CYCLIC:
+            type = node::CYCLIC;
             break;
-        case node::geoshape::FIXED:
-            type = node::geoshape::FIXED;
+        case node::FIXED:
+            type = node::FIXED;
             break;
         default:
-            type = node::geoshape::LINEAR;
+            type = node::LINEAR;
             break;
     }
     return is;
@@ -326,21 +332,25 @@ struct stealstack_node
         ar & work;
     }
 
+    void swap(stealstack_node& rhs)
+    {
+        std::swap(work, rhs.work);
+    }
+
     std::vector<node> work;
 };
 
 template <typename Stats>
 void show_stats(double walltime, Stats const & stats)
 {
-    int i, j;
     std::size_t tnodes = 0, tleaves = 0, trel = 0, tacq = 0, tsteal = 0, tfail= 0;
-    int mdepth = 0, mheight = 0;
+    std::size_t mdepth = 0, mheight = 0;
     double twork = 0.0, tsearch = 0.0, tidle = 0.0, tovh = 0.0;
     double max_times[4];
     double min_times[4];
-    double elapsedSecs;
+//    double elapsedSecs;
 
-    for (i = 0; i < 4; i++) {
+    for (int i = 0; i < 4; i++) {
         max_times[i] = 0.0;
         min_times[i] = stats[0].time[i];
     }
@@ -348,7 +358,6 @@ void show_stats(double walltime, Stats const & stats)
     // combine measurements from all threads
     BOOST_FOREACH(typename Stats::value_type const & stat, stats)
     {
-
         tnodes  += stat.n_nodes;
         tleaves += stat.n_leaves;
         trel    += stat.n_release;
@@ -359,8 +368,8 @@ void show_stats(double walltime, Stats const & stats)
         tsearch += stat.time[1];
         tidle   += stat.time[2];
         tovh    += stat.time[3];
-        mdepth   = std::max(mdepth, stat.max_stack_depth);
-        mheight  = std::max(mheight, stat.max_tree_depth);
+        mdepth   = (std::max)(mdepth, stat.max_stack_depth);
+        mheight  = (std::max)(mheight, stat.max_tree_depth);
 
         for (std::size_t j = 0; j < 4; j++) {
             if (max_times[j] < stat.time[j])
@@ -369,33 +378,34 @@ void show_stats(double walltime, Stats const & stats)
                 min_times[j] = stat.time[j];
         }
     }
-    
+
     if (trel != tacq + tsteal) {
         hpx::cout << "*** error! total released != total acquired + total stolen\n" << hpx::flush;
     }
-    
+
     //uts_showStats(ss_get_num_threads(), chunkSize, walltime, tnodes, tleaves, mheight);
-    
+
     // summarize execution info for machine consumption
     /*
     if (verbose == 0) {
         printf("%4d %7.3f %9llu %7.0llu %7.0llu %d %d %.2f %d %d %1d %f %3d\n",
-            nPes, walltime, nNodes, (long long)(nNodes/walltime), (long long)((nNodes/walltime)/nPes), chunkSize, 
+            nPes, walltime, nNodes, (long long)(nNodes/walltime), (long long)((nNodes/walltime)/nPes), chunkSize,
             type, b_0, rootId, gen_mx, shape_fn, nonLeafProb, nonLeafBF);
     }
     */
-    
+
     // summarize execution info for human consumption
     // else {
         hpx::cout
             << "Tree size = " << tnodes << ", "
             << "tree depth = " << mheight << ", "
-            << "num leaves = " << tleaves << " (" << tleaves/static_cast<float>(tnodes)*100.0f << "%)"
+            << "num leaves = " << tleaves
+                << " (" << tleaves/static_cast<float>(tnodes)*100.0f << "%)"
             << "\n" << hpx::flush;
 
         hpx::cout
-            << "Wallclock time = " << walltime << " sec, "
-            << "performance = " << (tnodes / walltime) << " nodes/sec "
+            << "Wallclock time = " << walltime << " sec\n"
+            << "Performance = " << (tnodes / walltime) << " nodes/sec "
             << "(" << (tnodes / walltime / stats.size()) << " nodes/sec per PE)\n"
             << "\n" << hpx::flush;
     //}
@@ -412,7 +422,7 @@ void show_stats(double walltime, Stats const & stats)
         printf("Max time per thread: Work = %.6f, Overhead = %6f, Search = %.6f, Idle = %.6f.\n\n", max_times[SS_WORK], max_times[SS_OVH],
             max_times[SS_SEARCH], max_times[SS_IDLE]);
     }
-    
+
     // per thread execution info
     if (verbose > 2) {
         for (i = 0; i < num_workers; i++) {

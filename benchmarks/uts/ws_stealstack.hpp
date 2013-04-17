@@ -8,6 +8,7 @@
 #define BENCHMARKS_UTS_WS_STEALSTACK_HPP
 
 #include <benchmarks/uts/params.hpp>
+#include <hpx/include/async.hpp>
 #include <hpx/include/components.hpp>
 
 namespace components
@@ -54,10 +55,10 @@ namespace components
 
                 ar & max_stack_depth;
                 ar & max_tree_depth;
-                
+
                 ar & time;
             }
-            
+
             std::size_t n_nodes;
             std::size_t n_leaves;
             std::size_t n_acquire;
@@ -65,9 +66,9 @@ namespace components
             std::size_t n_steal;
             std::size_t n_fail;
 
-            int max_stack_depth;
-            int max_tree_depth;
-            
+            std::size_t max_stack_depth;
+            std::size_t max_tree_depth;
+
             double time[NSTATES];
         };
 
@@ -101,7 +102,7 @@ namespace components
                 name += boost::lexical_cast<std::string>(i);
                 names.push_back(name);
             }
-            
+
             hpx::agas::register_name(names[rank], this->get_gid());
         }
 
@@ -111,7 +112,8 @@ namespace components
             size = s;
             param = p;
 
-            hpx::future<void> f = hpx::async(&ws_stealstack::init_symbolic_names, this);
+            hpx::future<void> f = hpx::async(
+                hpx::util::bind(&ws_stealstack::init_symbolic_names, this));
 
             last_steal = rank;
 
@@ -141,7 +143,7 @@ namespace components
                 hpx::agas::resolve_name(names[i], ids[i]);
             }
         }
-        
+
         HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, resolve_names);
 
         void put_work(node const & n)
@@ -166,21 +168,21 @@ namespace components
                 {
                     throw std::logic_error("ss_put_work(): Block has overflowed!");
                 }
-                
+
                 stealstack_node & node = local_queue.front();
 
                 node.work.push_back(n);
             }
             local_work++;
-            int local_work_tmp = local_work;
-            stat.max_stack_depth = std::max(local_work_tmp, stat.max_stack_depth);
+            std::size_t local_work_tmp = local_work;
+            stat.max_stack_depth = (std::max)(local_work_tmp, stat.max_stack_depth);
         }
 
         void gen_children(node & parent)
         {
-            int parent_height = parent.height;
+            std::size_t parent_height = parent.height;
 
-            stat.max_tree_depth = std::max(stat.max_tree_depth, parent_height);
+            stat.max_tree_depth = (std::max)(stat.max_tree_depth, parent_height);
 
             int num_children = parent.get_num_children(param);
             int child_type = parent.child_type(param);
@@ -208,20 +210,28 @@ namespace components
                 ++stat.n_leaves;
             }
         }
-        
+
         std::pair<bool, stealstack_node> steal_work()
         {
-            std::pair<bool, stealstack_node> res = std::make_pair(false, stealstack_node(param.chunk_size));
+            std::pair<bool, stealstack_node> res = 
+                std::make_pair(false, stealstack_node(param.chunk_size));
 
             {
                 mutex_type::scoped_lock lk(local_queue_mtx);
                 if(local_queue.size() > 2)
                 {
-                    res.second = local_queue.back();
+                    std::swap(res.second, local_queue.back());
                     local_queue.pop_back();
+
+                    if(local_work < res.second.work.size())
+                    {
+                        throw std::logic_error(
+                            "ensure_local_work(): local_work count is less than 0!");
+                    }
+                    local_work -= res.second.work.size();
                 }
-                local_work -= res.second.work.size();
             }
+
             if(local_work > 0)
             {
                 res.first = true;
@@ -234,11 +244,6 @@ namespace components
 
         bool ensure_local_work()
         {
-            if(local_work < 0)
-            {
-                throw std::logic_error("ensure_local_work(): local_work count is less than 0!");
-            }
-
             while(local_work == 0)
             {
                 bool terminate = true;
@@ -285,6 +290,11 @@ namespace components
             }
 
             stat.n_nodes += work.size();
+            if (local_work < work.size())
+            {
+                throw std::logic_error(
+                    "ensure_local_work(): local_work count is less than 0!");
+            }
             local_work -= work.size();
 
             if(work.size() == 0)
@@ -311,7 +321,7 @@ namespace components
                 parents.clear();
             }
         }
-        
+
         HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, tree_search);
 
         stats get_stats()
@@ -321,35 +331,35 @@ namespace components
 
         HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, get_stats);
 
-        private:
-            std::vector<std::string> names;
-            std::vector<hpx::id_type> ids;
-            boost::atomic<int> local_work;
+    private:
+        std::vector<std::string> names;
+        std::vector<hpx::id_type> ids;
+        boost::atomic<std::size_t> local_work;
 
-            stats stat;
+        stats stat;
 
-            double walltime;
-            double work_time;
-            double search_time;
-            double idle_time;
-            int idle_sessions;
-            double time_last;
-            int entries[NSTATES];
-            int curState;
+        double walltime;
+        double work_time;
+        double search_time;
+        double idle_time;
+        int idle_sessions;
+        double time_last;
+        int entries[NSTATES];
+        int curState;
 
-            double start_time;
+        double start_time;
 
-            std::deque<stealstack_node> local_queue;
-            int last_steal;
-            int chunks_recvd;
-            int chunks_sent;
-            int ctrl_recvd;
-            int ctrl_sent;
+        std::deque<stealstack_node> local_queue;
+        std::size_t last_steal;
+        int chunks_recvd;
+        int chunks_sent;
+        int ctrl_recvd;
+        int ctrl_sent;
 
-            params param;
-            bool pollint_adaptive;
-            std::size_t rank;
-            std::size_t size;
+        params param;
+        bool pollint_adaptive;
+        std::size_t rank;
+        std::size_t size;
     };
 }
 

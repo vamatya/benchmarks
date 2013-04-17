@@ -61,7 +61,7 @@ struct params
             double q = non_leaf_prob;
             int m = non_leaf_bf;
             double es = (1.0 / (1.0 - q * m));
-            
+
             hpx::cout
                 << "  BIN parameters: "
                 << "q = " << q << ", m = " << m << ", E(n) = " << q * m << ", E(s) = " << es << "\n";
@@ -81,8 +81,8 @@ struct params
                 << std::pow(b_0, gen_mx) << " leaves\n";
         }
 
-        std::size_t num_threads = 0;
-        
+        std::size_t num_threads = hpx::get_worker_thread_num();
+
         // random number generator
         char strBuf[1024];
         rng_showtype(strBuf, 0);
@@ -140,7 +140,7 @@ inline boost::program_options::options_description uts_params_desc()
     desc.add_options()
         (
             "tree-type"
-          , boost::program_options::value<node::tree_type>()->default_value(node::tree_type::GEO)
+          , boost::program_options::value<node::tree_type>()->default_value(node::GEO)
           , "tree type (0: BIN, 1: GEO, 2: HYBRID, 3: BALANCED)"
         )
         (
@@ -155,7 +155,7 @@ inline boost::program_options::options_description uts_params_desc()
         )
         (
             "tree-shape"
-          , boost::program_options::value<node::geoshape>()->default_value(node::geoshape::LINEAR)
+          , boost::program_options::value<node::geoshape>()->default_value(node::LINEAR)
           , "GEO: tree shape function"
         )
         (
@@ -214,7 +214,8 @@ inline boost::program_options::options_description uts_params_desc()
 }
 
 template <typename StealStack>
-inline std::vector<hpx::id_type> create_stealstacks(boost::program_options::variables_map & vm, const char * name)
+inline std::vector<hpx::id_type> create_stealstacks(
+    boost::program_options::variables_map & vm, const char * name)
 {
     std::size_t num_stealstacks = vm["num-stealstacks"].as<std::size_t>();
 
@@ -223,7 +224,7 @@ inline std::vector<hpx::id_type> create_stealstacks(boost::program_options::vari
 
     using hpx::components::distributing_factory;
     distributing_factory factory;
-    
+
     factory.create(hpx::find_here());
 
     distributing_factory::async_create_result_type

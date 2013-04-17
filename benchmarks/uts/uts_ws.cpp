@@ -6,7 +6,7 @@
 
 /*******************************************************************************
  *
- * 
+ *
  *
  ******************************************************************************/
 
@@ -19,7 +19,8 @@ HPX_REGISTER_MINIMAL_COMPONENT_FACTORY(
 
 int hpx_main(boost::program_options::variables_map & vm)
 {
-    std::vector<hpx::id_type> stealstacks = create_stealstacks<components::ws_stealstack>(vm, "workstealing");
+    std::vector<hpx::id_type> stealstacks =
+        create_stealstacks<components::ws_stealstack>(vm, "workstealing");
 
     hpx::util::high_resolution_timer t;
 
@@ -37,7 +38,7 @@ int hpx_main(boost::program_options::variables_map & vm)
     hpx::wait(tree_search_futures);
 
     double elapsed = t.elapsed();
-    
+
     std::vector<hpx::future<components::ws_stealstack::stats> > stats_futures;
     stats_futures.reserve(stealstacks.size());
     BOOST_FOREACH(hpx::id_type const & id, stealstacks)
@@ -48,6 +49,7 @@ int hpx_main(boost::program_options::variables_map & vm)
             )
         );
     }
+
     std::vector<components::ws_stealstack::stats> stats;
     stats.reserve(stealstacks.size());
     hpx::wait(stats_futures, stats);

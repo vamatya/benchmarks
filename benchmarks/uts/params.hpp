@@ -81,7 +81,7 @@ struct params
                 << std::pow(b_0, gen_mx) << " leaves\n";
         }
 
-        std::size_t num_threads = hpx::get_worker_thread_num();
+        std::size_t num_threads = hpx::get_num_worker_threads();
 
         // random number generator
         char strBuf[1024];

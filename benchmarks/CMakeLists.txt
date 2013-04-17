@@ -5,6 +5,7 @@
 
 set(subdirs
     network
+    uts
 #    performance
 #    statistical
     )

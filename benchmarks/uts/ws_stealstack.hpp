@@ -211,24 +211,29 @@ namespace components
             }
         }
 
-        std::pair<bool, stealstack_node> steal_work()
+        std::pair<bool, std::vector<stealstack_node> > steal_work()
         {
-            std::pair<bool, stealstack_node> res = 
-                std::make_pair(false, stealstack_node(param.chunk_size));
+            std::pair<bool, std::vector<stealstack_node> > res = 
+                std::make_pair(false, std::vector<stealstack_node>());
 
             {
                 mutex_type::scoped_lock lk(local_queue_mtx);
                 if(local_queue.size() > 2)
                 {
-                    std::swap(res.second, local_queue.back());
-                    local_queue.pop_back();
-
-                    if(local_work < res.second.work.size())
+                    std::size_t steal_num = local_queue.size()/2;
+                    res.second.resize(steal_num);
+                    for(std::size_t i = 0; i < steal_num; ++i)
                     {
-                        throw std::logic_error(
-                            "ensure_local_work(): local_work count is less than 0!");
+                        std::swap(res.second[i], local_queue.back());
+                        local_queue.pop_back();
+
+                        if(local_work < res.second[i].work.size())
+                        {
+                            throw std::logic_error(
+                                "ensure_local_work(): local_work count is less than 0!");
+                        }
+                        local_work -= res.second[i].work.size();
                     }
-                    local_work -= res.second.work.size();
                 }
             }
 
@@ -253,17 +258,22 @@ namespace components
                     if(last_steal == rank) last_steal = (last_steal + 1) % size;
 
                     ws_stealstack::steal_work_action act;
-                    std::pair<bool, stealstack_node> node_pair(act(ids[last_steal]));
+                    std::pair<bool, std::vector<stealstack_node> > node_pair(act(ids[last_steal]));
 
-                    if(node_pair.second.work.size() > 0)
+                    bool break_ = false;
+                    BOOST_FOREACH(stealstack_node & ss_node, node_pair.second)
                     {
-                        mutex_type::scoped_lock lk(local_queue_mtx);
-                        terminate = false;
+                        if(ss_node.work.size() > 0)
+                        {
+                            mutex_type::scoped_lock lk(local_queue_mtx);
+                            terminate = false;
 
-                        local_queue.push_back(node_pair.second);
-                        local_work += node_pair.second.work.size();
-                        break;
+                            local_queue.push_back(ss_node);
+                            local_work += ss_node.work.size();
+                            break_ = true;
+                        }
                     }
+                    if(break_) break;
                     if(node_pair.first)
                     {
                         terminate = false;

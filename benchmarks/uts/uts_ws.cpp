@@ -19,6 +19,7 @@ HPX_REGISTER_MINIMAL_COMPONENT_FACTORY(
 
 int hpx_main(boost::program_options::variables_map & vm)
 {
+    std::cout << "startup complete\n";
     std::vector<hpx::id_type> stealstacks =
         create_stealstacks<components::ws_stealstack>(vm, "workstealing");
 
@@ -55,7 +56,10 @@ int hpx_main(boost::program_options::variables_map & vm)
     hpx::wait(stats_futures, stats);
     show_stats(elapsed, stats);
 
-    return hpx::finalize();
+    //return hpx::finalize();
+    hpx::terminate();
+
+    return 0;
 }
 
 int main(int argc, char* argv[])

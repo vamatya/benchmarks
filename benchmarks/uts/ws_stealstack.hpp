@@ -61,8 +61,8 @@ namespace components
 
             std::size_t n_nodes;
             std::size_t n_leaves;
-            std::size_t n_acquire;
             std::size_t n_release;
+            std::size_t n_acquire;
             std::size_t n_steal;
             std::size_t n_fail;
 
@@ -95,6 +95,7 @@ namespace components
 
         void init_symbolic_names()
         {
+            /*
             names.reserve(size);
             for(std::size_t i = 0; i < size; ++i)
             {
@@ -104,6 +105,7 @@ namespace components
             }
 
             hpx::agas::register_name(names[rank], this->get_gid());
+            */
         }
 
         void init(params p, std::size_t r, std::size_t s)
@@ -135,13 +137,16 @@ namespace components
 
         HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, init);
 
-        void resolve_names()
+        void resolve_names(std::vector<hpx::id_type> const & idss)
         {
+            ids = idss;
+            /*
             ids.resize(size);
             for(std::size_t i = 0; i < names.size(); ++i)
             {
                 hpx::agas::resolve_name(names[i], ids[i]);
             }
+            */
         }
 
         HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, resolve_names);
@@ -274,6 +279,7 @@ namespace components
                         }
                     }
                     if(break_) break;
+
                     if(node_pair.first)
                     {
                         terminate = false;

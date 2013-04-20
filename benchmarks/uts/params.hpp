@@ -32,7 +32,7 @@ struct params
       , non_leaf_bf(vm["num-children"].as<int>())
       , shift_depth(vm["fraction-of-depth"].as<double>())
       , compute_granularity(vm["compute-granularity"].as<int>())
-      , chunk_size(vm["chunk-size"].as<int>())
+      , chunk_size(vm["chunk-size"].as<std::size_t>())
       , polling_interval(vm["interval"].as<int>())
       , verbose(vm["verbose"].as<int>())
       , debug(vm["debug"].as<int>())
@@ -126,7 +126,7 @@ struct params
     int non_leaf_bf;
     double shift_depth;
     int compute_granularity;
-    int chunk_size;
+    std::size_t chunk_size;
     int polling_interval;
     int verbose;
     int debug;
@@ -185,7 +185,7 @@ inline boost::program_options::options_description uts_params_desc()
         )
         (
             "chunk-size"
-          , boost::program_options::value<int>()->default_value(20)
+          , boost::program_options::value<std::size_t>()->default_value(20)
           , "chunksize for work sharing and work stealing"
         )
         (
@@ -257,7 +257,7 @@ inline std::vector<hpx::id_type> create_stealstacks(
     BOOST_FOREACH(hpx::id_type const & id, stealstacks)
     {
         resolve_names_futures.push_back(
-            hpx::async<typename StealStack::resolve_names_action>(id)
+            hpx::async<typename StealStack::resolve_names_action>(id, stealstacks)
         );
     }
 

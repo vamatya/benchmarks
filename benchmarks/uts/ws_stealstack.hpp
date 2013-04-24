@@ -93,29 +93,11 @@ namespace components
         typedef hpx::lcos::local::spinlock mutex_type;
         mutex_type local_queue_mtx;
 
-        void init_symbolic_names()
-        {
-            /*
-            names.reserve(size);
-            for(std::size_t i = 0; i < size; ++i)
-            {
-                std::string name("ws_stealstack_");
-                name += boost::lexical_cast<std::string>(i);
-                names.push_back(name);
-            }
-
-            hpx::agas::register_name(names[rank], this->get_gid());
-            */
-        }
-
         void init(params p, std::size_t r, std::size_t s)
         {
             rank = r;
             size = s;
             param = p;
-
-            hpx::future<void> f = hpx::async(
-                hpx::util::bind(&ws_stealstack::init_symbolic_names, this));
 
             last_steal = rank;
 
@@ -131,8 +113,6 @@ namespace components
                 n.init_root(param);
                 put_work(n);
             }
-
-            hpx::wait(f);
         }
 
         HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, init);
@@ -140,13 +120,6 @@ namespace components
         void resolve_names(std::vector<hpx::id_type> const & idss)
         {
             ids = idss;
-            /*
-            ids.resize(size);
-            for(std::size_t i = 0; i < names.size(); ++i)
-            {
-                hpx::agas::resolve_name(names[i], ids[i]);
-            }
-            */
         }
 
         HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, resolve_names);
@@ -348,7 +321,6 @@ namespace components
         HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, get_stats);
 
     private:
-        std::vector<std::string> names;
         std::vector<hpx::id_type> ids;
         boost::atomic<std::size_t> local_work;
 

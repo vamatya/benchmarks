@@ -27,7 +27,7 @@ struct params
       , b_0(vm["root-branching-factor"].as<double>())
       , root_id(vm["root-seed"].as<int>())
       , shape_fn(vm["tree-shape"].as<node::geoshape>())
-      , gen_mx(vm["tree-depth"].as<int>())
+      , gen_mx(vm["tree-depth"].as<std::size_t>())
       , non_leaf_prob(vm["non-leaf-probability"].as<double>())
       , non_leaf_bf(vm["num-children"].as<int>())
       , shift_depth(vm["fraction-of-depth"].as<double>())
@@ -121,7 +121,7 @@ struct params
     double b_0;
     int root_id;
     node::geoshape shape_fn;
-    int gen_mx;
+    std::size_t gen_mx;
     double non_leaf_prob;
     int non_leaf_bf;
     double shift_depth;
@@ -160,7 +160,7 @@ inline boost::program_options::options_description uts_params_desc()
         )
         (
             "tree-depth"
-          , boost::program_options::value<int>()->default_value(6)
+          , boost::program_options::value<std::size_t>()->default_value(6)
           , "GEO, BALANCED: tree depth"
         )
         (
@@ -194,9 +194,9 @@ inline boost::program_options::options_description uts_params_desc()
           , "work stealing/sharing interval (stealing default: adaptive)"
         )
         (
-            "num-stealstacks"
-          , boost::program_options::value<std::size_t>()->default_value(1)
-          , "Number of steal stack components to instantiate"
+            "overcommit-factor"
+          , boost::program_options::value<float>()->default_value(1.0)
+          , "Number of steal stacks to instantiantiate per locality: number_of_threads * overcommit-factor"
         )
         (
             "verbose"
@@ -213,36 +213,135 @@ inline boost::program_options::options_description uts_params_desc()
     return desc;
 }
 
+inline std::pair<std::size_t, std::vector<hpx::util::remote_locality_result> >
+distribute_stealstacks(std::vector<hpx::id_type> localities, float overcommit_factor, hpx::components::component_type type);
+
+HPX_PLAIN_ACTION(distribute_stealstacks);
+
+inline std::pair<std::size_t, std::vector<hpx::util::remote_locality_result> >
+distribute_stealstacks(std::vector<hpx::id_type> localities, float overcommit_factor, hpx::components::component_type type)
+{
+    typedef hpx::util::remote_locality_result value_type;
+    typedef std::pair<std::size_t, std::vector<value_type> > result_type;
+
+    result_type res;
+    if(localities.size() == 0) return res;
+
+    hpx::id_type this_loc = localities[0];
+
+    typedef
+        hpx::components::server::runtime_support::bulk_create_components_action
+        action_type;
+
+    std::size_t worker_threads = hpx::get_os_thread_count();
+
+    std::size_t num_stealstacks = worker_threads * overcommit_factor;
+
+    typedef hpx::future<std::vector<hpx::naming::gid_type> > future_type;
+
+    future_type f;
+    {
+        hpx::lcos::packaged_action<action_type, std::vector<hpx::naming::gid_type> > p;
+        p.apply(this_loc, type, num_stealstacks);
+        f = p.get_future();
+    }
+
+    std::vector<hpx::future<result_type> > stealstacks_futures;
+    stealstacks_futures.reserve(2);
+
+    if(localities.size() > 1)
+    {
+        std::size_t half = (localities.size() / 2) + 1;
+        std::vector<hpx::id_type> locs_first(localities.begin() + 1, localities.begin() + half);
+        std::vector<hpx::id_type> locs_second(localities.begin() + half, localities.end());
+
+
+        if(locs_first.size() > 0)
+        {
+            hpx::lcos::packaged_action<distribute_stealstacks_action, result_type > p;
+            hpx::id_type id = locs_first[0];
+            p.apply(id, boost::move(locs_first), overcommit_factor, type);
+            stealstacks_futures.push_back(
+                p.get_future()
+            );
+        }
+
+        if(locs_second.size() > 0)
+        {
+            hpx::lcos::packaged_action<distribute_stealstacks_action, result_type > p;
+            hpx::id_type id = locs_second[0];
+            p.apply(id, boost::move(locs_second), overcommit_factor, type);
+            stealstacks_futures.push_back(
+                p.get_future()
+            );
+        }
+    }
+
+    res.first = num_stealstacks;
+    res.second.push_back(
+        value_type(this_loc.get_gid(), type)
+    );
+    res.second.back().gids_ = boost::move(f.move());
+
+    while(!stealstacks_futures.empty())
+    {
+        HPX_STD_TUPLE<int, hpx::future<result_type> >
+            ss_res = hpx::wait_any(stealstacks_futures);
+
+        result_type r = boost::move(HPX_STD_GET(1, ss_res).move());
+        res.second.insert(res.second.end(), r.second.begin(), r.second.end());
+        res.first += r.first;
+        stealstacks_futures.erase(stealstacks_futures.begin() + HPX_STD_GET(0, ss_res));
+    }
+
+    return res;
+}
+
 template <typename StealStack>
 inline std::vector<hpx::id_type> create_stealstacks(
     boost::program_options::variables_map & vm, const char * name)
 {
-    std::size_t num_stealstacks = vm["num-stealstacks"].as<std::size_t>();
+    float overcommit_factor = vm["overcommit-factor"].as<float>();
+
 
     hpx::components::component_type type =
         hpx::components::get_component_type<StealStack>();
+    
+    std::vector<hpx::id_type> localities = hpx::find_all_localities(type);
+
 
     using hpx::components::distributing_factory;
-    distributing_factory factory;
 
-    factory.create(hpx::find_here());
-
-    distributing_factory::async_create_result_type
-        async_result = factory.create_components_async(type, num_stealstacks);
+    hpx::id_type id = localities[0];
+    hpx::future<std::pair<std::size_t, std::vector<hpx::util::remote_locality_result> > >
+        async_result = hpx::async<distribute_stealstacks_action>(
+            id, boost::move(localities), overcommit_factor, type);
 
     params p(vm);
 
     p.print(name);
 
     std::vector<hpx::id_type> stealstacks;
-    stealstacks.reserve(num_stealstacks);
 
     std::vector<hpx::future<void> > init_futures;
-    init_futures.reserve(num_stealstacks);
 
     std::size_t i = 0;
-    distributing_factory::result_type result(async_result.get());
-    BOOST_FOREACH(hpx::id_type id, hpx::util::locality_results(result))
+    std::pair<std::size_t, std::vector<hpx::util::remote_locality_result> >
+        result(boost::move(async_result.move()));
+
+    std::size_t num_stealstacks = result.first;
+    std::cout << "num stealstacks: " << num_stealstacks << "\n";
+    stealstacks.reserve(num_stealstacks);
+    init_futures.reserve(num_stealstacks);
+
+    std::vector<hpx::util::locality_result> res;
+    res.reserve(result.second.size());
+    BOOST_FOREACH(hpx::util::remote_locality_result const & rl, result.second)
+    {
+        res.push_back(rl);
+    }
+
+    BOOST_FOREACH(hpx::id_type id, hpx::util::locality_results(res))
     {
         init_futures.push_back(
             hpx::async<typename StealStack::init_action>(id, p, i, num_stealstacks)

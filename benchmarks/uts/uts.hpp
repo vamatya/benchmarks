@@ -406,7 +406,7 @@ void show_stats(double walltime, Stats const & stats)
         hpx::cout
             << "Wallclock time = " << walltime << " sec\n"
             << "Performance = " << (tnodes / walltime) << " nodes/sec "
-            << "(" << (tnodes / walltime / stats.size()) << " nodes/sec per PE)\n"
+            << "(" << (tnodes / walltime / hpx::get_num_worker_threads()) << " nodes/sec per PE)\n"
             << "\n" << hpx::flush;
     //}
 

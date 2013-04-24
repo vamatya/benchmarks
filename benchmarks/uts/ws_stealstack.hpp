@@ -74,6 +74,7 @@ namespace components
 
         ws_stealstack()
           : local_work(0)
+          , work_shared(0)
           , walltime(0)
           , work_time(0)
           , search_time(0)
@@ -100,6 +101,7 @@ namespace components
             param = p;
 
             last_steal = rank;
+            last_share = rank;
 
             if(p.polling_interval == 0)
             {
@@ -182,6 +184,35 @@ namespace components
 
                     put_work(child);
                 }
+                /*
+                if(size > 1)
+                {
+                    if(local_work > param.chunk_size * param.chunk_size)
+                    {
+                        mutex_type::scoped_lock lk(local_queue_mtx);
+                        last_share = (last_share + 1) % size;
+                        if(last_share == rank) last_share = (last_share + 1) % size;
+
+                        std::size_t steal_num = local_queue.size()/2;
+                        std::vector<stealstack_node> nodes;
+                        nodes.resize(steal_num);
+                        for(std::size_t i = 0; i < steal_num; ++i)
+                        {
+                            std::swap(nodes[i], local_queue.back());
+                            local_queue.pop_back();
+
+                            if(local_work < nodes[i].work.size())
+                            {
+                                throw std::logic_error(
+                                    "gen_children(): local_work count is less than 0!");
+                            }
+                            local_work -= nodes[i].work.size();
+                            work_shared += nodes[i].work.size();
+                        }
+                        hpx::apply<share_work_action>(ids[last_share], rank, nodes);
+                    }
+                }
+                */
             }
             else
             {
@@ -194,28 +225,26 @@ namespace components
             std::pair<bool, std::vector<stealstack_node> > res = 
                 std::make_pair(false, std::vector<stealstack_node>());
 
+            if(local_work > param.chunk_size * param.chunk_size)
             {
                 mutex_type::scoped_lock lk(local_queue_mtx);
-                if(local_queue.size() > 2)
+                std::size_t steal_num = local_queue.size()/2;
+                res.second.resize(steal_num);
+                for(std::size_t i = 0; i < steal_num; ++i)
                 {
-                    std::size_t steal_num = local_queue.size()/2;
-                    res.second.resize(steal_num);
-                    for(std::size_t i = 0; i < steal_num; ++i)
-                    {
-                        std::swap(res.second[i], local_queue.back());
-                        local_queue.pop_back();
+                    std::swap(res.second[i], local_queue.back());
+                    local_queue.pop_back();
 
-                        if(local_work < res.second[i].work.size())
-                        {
-                            throw std::logic_error(
-                                "ensure_local_work(): local_work count is less than 0!");
-                        }
-                        local_work -= res.second[i].work.size();
+                    if(local_work < res.second[i].work.size())
+                    {
+                        throw std::logic_error(
+                            "ensure_local_work(): local_work count is less than 0!");
                     }
+                    local_work -= res.second[i].work.size();
                 }
             }
 
-            if(local_work > 0)
+            if(local_work > 0 || work_shared > 0)
             {
                 res.first = true;
             }
@@ -224,6 +253,45 @@ namespace components
         }
 
         HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, steal_work);
+
+        void share_work(std::size_t src, std::vector<stealstack_node> const & work)
+        {
+            if(local_work > 2 * param.chunk_size)
+            {
+                mutex_type::scoped_lock lk(local_queue_mtx);
+                last_share = (last_share + 1) % size;
+                if(last_share == rank) last_share = (last_share + 1) % size;
+                {
+                    hpx::util::unlock_the_lock<mutex_type::scoped_lock> ull(lk);
+                    hpx::apply<share_work_action>(ids[last_share], src, work);
+                }
+            }
+            else
+            {
+                std::size_t count = 0;
+                BOOST_FOREACH(stealstack_node const & ss_node, work)
+                {
+                    if(ss_node.work.size() > 0)
+                    {
+                        mutex_type::scoped_lock lk(local_queue_mtx);
+
+                        local_queue.push_back(ss_node);
+                        local_work += ss_node.work.size();
+                        count += ss_node.work.size();
+                    }
+                }
+                hpx::apply<ack_share_action>(ids[src], count);
+            }
+        }
+        
+        HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, share_work);
+
+        void ack_share(std::size_t work)
+        {
+            work_shared -= work;
+        }
+        
+        HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, ack_share);
 
         bool ensure_local_work()
         {
@@ -236,7 +304,7 @@ namespace components
                     if(last_steal == rank) last_steal = (last_steal + 1) % size;
 
                     ws_stealstack::steal_work_action act;
-                    std::pair<bool, std::vector<stealstack_node> > node_pair(act(ids[last_steal]));
+                    std::pair<bool, std::vector<stealstack_node> > node_pair(boost::move(act(ids[last_steal])));
 
                     bool break_ = false;
                     BOOST_FOREACH(stealstack_node & ss_node, node_pair.second)
@@ -251,7 +319,7 @@ namespace components
                             break_ = true;
                         }
                     }
-                    if(break_) break;
+                    if(break_ || local_work > 0) break;
 
                     if(node_pair.first)
                     {
@@ -323,6 +391,7 @@ namespace components
     private:
         std::vector<hpx::id_type> ids;
         boost::atomic<std::size_t> local_work;
+        boost::atomic<std::size_t> work_shared;
 
         stats stat;
 
@@ -339,6 +408,7 @@ namespace components
 
         std::deque<stealstack_node> local_queue;
         std::size_t last_steal;
+        std::size_t last_share;
         int chunks_recvd;
         int chunks_sent;
         int ctrl_recvd;

@@ -4,8 +4,8 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#ifndef BENCHMARKS_UTS_WS_STEALSTACK_HPP
-#define BENCHMARKS_UTS_WS_STEALSTACK_HPP
+#ifndef BENCHMARKS_UTS_WM_STEALSTACK_HPP
+#define BENCHMARKS_UTS_WM_STEALSTACK_HPP
 
 #include <benchmarks/uts/params.hpp>
 #include <hpx/include/async.hpp>
@@ -13,8 +13,8 @@
 
 namespace components
 {
-    struct ws_stealstack
-      : hpx::components::managed_component_base<ws_stealstack>
+    struct wm_stealstack
+      : hpx::components::managed_component_base<wm_stealstack>
     {
         enum states
         {
@@ -72,7 +72,7 @@ namespace components
             double time[NSTATES];
         };
 
-        ws_stealstack()
+        wm_stealstack()
           : local_work(0)
           , work_shared(0)
           , walltime(0)
@@ -117,14 +117,14 @@ namespace components
             }
         }
 
-        HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, init);
+        HPX_DEFINE_COMPONENT_ACTION(wm_stealstack, init);
 
         void resolve_names(std::vector<hpx::id_type> const & idss)
         {
             ids = idss;
         }
 
-        HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, resolve_names);
+        HPX_DEFINE_COMPONENT_ACTION(wm_stealstack, resolve_names);
 
         void put_work(node const & n)
         {
@@ -158,6 +158,36 @@ namespace components
             stat.max_stack_depth = (std::max)(local_work_tmp, stat.max_stack_depth);
         }
 
+        void distribute_work()
+        {
+            if(size == 1) return;
+
+            if(local_work > param.chunk_size * param.chunk_size)
+            {
+                mutex_type::scoped_lock lk(local_queue_mtx);
+                last_share = (last_share + 1) % size;
+                if(last_share == rank) last_share = (last_share + 1) % size;
+
+                std::size_t steal_num = local_queue.size()/2;
+                std::vector<stealstack_node> nodes;
+                nodes.resize(steal_num);
+                for(std::size_t i = 0; i < steal_num; ++i)
+                {
+                    std::swap(nodes[i], local_queue.back());
+                    local_queue.pop_back();
+
+                    if(local_work < nodes[i].work.size())
+                    {
+                        throw std::logic_error(
+                            "gen_children(): local_work count is less than 0!");
+                    }
+                    local_work -= nodes[i].work.size();
+                    work_shared += nodes[i].work.size();
+                }
+                hpx::apply<share_work_action>(ids[last_share], rank, nodes);
+            }
+        }
+
         void gen_children(node & parent)
         {
             std::size_t parent_height = parent.height;
@@ -189,74 +219,86 @@ namespace components
             {
                 ++stat.n_leaves;
             }
+            distribute_work();
         }
 
-        std::pair<bool, std::vector<stealstack_node> > steal_work()
+        void share_work(std::size_t src, std::vector<stealstack_node> const & work)
         {
-            std::pair<bool, std::vector<stealstack_node> > res = 
-                std::make_pair(false, std::vector<stealstack_node>());
-
-            if(local_work > param.chunk_size * param.chunk_size)
+            std::size_t count = 0;
+            BOOST_FOREACH(stealstack_node const & ss_node, work)
             {
-                mutex_type::scoped_lock lk(local_queue_mtx);
-                std::size_t steal_num = local_queue.size()/2;
-                res.second.resize(steal_num);
-                for(std::size_t i = 0; i < steal_num; ++i)
+                if(ss_node.work.size() > 0)
                 {
-                    std::swap(res.second[i], local_queue.back());
-                    local_queue.pop_back();
+                    mutex_type::scoped_lock lk(local_queue_mtx);
 
-                    if(local_work < res.second[i].work.size())
-                    {
-                        throw std::logic_error(
-                            "ensure_local_work(): local_work count is less than 0!");
-                    }
-                    local_work -= res.second[i].work.size();
+                    local_queue.push_back(ss_node);
+                    local_work += ss_node.work.size();
+                    count += ss_node.work.size();
                 }
             }
-
-            if(local_work > 0 || work_shared > 0)
-            {
-                res.first = true;
-            }
-
-            return res;
+            hpx::apply<ack_share_action>(ids[src], count);
+            
+            distribute_work();
         }
+        
+        HPX_DEFINE_COMPONENT_ACTION(wm_stealstack, share_work);
 
-        HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, steal_work);
+        void ack_share(std::size_t work)
+        {
+            work_shared -= work;
+        }
+        
+        HPX_DEFINE_COMPONENT_ACTION(wm_stealstack, ack_share);
+
+        bool got_work(std::size_t src, int dir)
+        {
+            if(local_work == 0 && work_shared == 0)
+            {
+                if(rank == 0 && dir == -1) return false;
+                if(rank == size-1 && dir == +1) return false;
+                return wm_stealstack::got_work_action()(ids[rank + dir], rank, dir);
+            }
+            return true;
+        }
+        
+        HPX_DEFINE_COMPONENT_ACTION(wm_stealstack, got_work);
 
         bool ensure_local_work()
         {
             while(local_work == 0)
             {
-                bool terminate = true;
-                for(std::size_t i = 0; i < size -1; ++i)
+                std::vector<hpx::future<bool> > terminate_futures;
+
+                if(rank > 0)
                 {
-                    last_steal = (last_steal + 1) % size;
-                    if(last_steal == rank) last_steal = (last_steal + 1) % size;
+                    terminate_futures.push_back(
+                        hpx::async<wm_stealstack::got_work_action>(
+                            ids[rank - 1]
+                          , rank
+                          , -1
+                        )
+                    );
+                }
+                if(rank < size -1)
+                {
+                    terminate_futures.push_back(
+                        hpx::async<wm_stealstack::got_work_action>(
+                            ids[rank + 1]
+                          , rank
+                          , +1
+                        )
+                    );
+                }
 
-                    ws_stealstack::steal_work_action act;
-                    std::pair<bool, std::vector<stealstack_node> > node_pair(boost::move(act(ids[last_steal])));
-
-                    bool break_ = false;
-                    BOOST_FOREACH(stealstack_node & ss_node, node_pair.second)
-                    {
-                        if(ss_node.work.size() > 0)
-                        {
-                            mutex_type::scoped_lock lk(local_queue_mtx);
-                            terminate = false;
-
-                            local_queue.push_back(ss_node);
-                            local_work += ss_node.work.size();
-                            break_ = true;
-                        }
-                    }
-                    if(break_ || local_work > 0) break;
-
-                    if(node_pair.first)
+                bool terminate = true;
+                while(!terminate_futures.empty())
+                {
+                    HPX_STD_TUPLE<int, hpx::future<bool> > terminate_res = hpx::wait_any(terminate_futures);
+                    if(HPX_STD_GET(1, terminate_res).get() == true)
                     {
                         terminate = false;
                     }
+                    terminate_futures.erase(terminate_futures.begin() + HPX_STD_GET(0, terminate_res));
                 }
 
                 if(terminate) return false;
@@ -297,6 +339,7 @@ namespace components
 
             return true;
         }
+        
 
         void tree_search()
         {
@@ -311,14 +354,14 @@ namespace components
             }
         }
 
-        HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, tree_search);
+        HPX_DEFINE_COMPONENT_ACTION(wm_stealstack, tree_search);
 
         stats get_stats()
         {
             return stat;
         }
 
-        HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, get_stats);
+        HPX_DEFINE_COMPONENT_ACTION(wm_stealstack, get_stats);
 
     private:
         std::vector<hpx::id_type> ids;

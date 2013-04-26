@@ -341,7 +341,7 @@ struct stealstack_node
 };
 
 template <typename Stats>
-void show_stats(double walltime, Stats const & stats)
+void show_stats(double walltime, Stats const & stats, int verbose, std::size_t chunk_size, float overcommit_factor)
 {
     std::size_t tnodes = 0, tleaves = 0, trel = 0, tacq = 0, tsteal = 0, tfail= 0;
     std::size_t mdepth = 0, mheight = 0;
@@ -386,16 +386,26 @@ void show_stats(double walltime, Stats const & stats)
     //uts_showStats(ss_get_num_threads(), chunkSize, walltime, tnodes, tleaves, mheight);
 
     // summarize execution info for machine consumption
-    /*
     if (verbose == 0) {
+        std::size_t num_threads = hpx::get_num_worker_threads();
+        hpx::cout
+            << num_threads << " "
+            << walltime << " "
+            << tnodes << " "
+            << static_cast<long long>(tnodes/walltime) << " "
+            << static_cast<long long>((tnodes/walltime)/num_threads) << " "
+            << chunk_size << " "
+            << overcommit_factor << "\n"
+            << hpx::flush;
+        /*
         printf("%4d %7.3f %9llu %7.0llu %7.0llu %d %d %.2f %d %d %1d %f %3d\n",
             nPes, walltime, nNodes, (long long)(nNodes/walltime), (long long)((nNodes/walltime)/nPes), chunkSize,
             type, b_0, rootId, gen_mx, shape_fn, nonLeafProb, nonLeafBF);
+        */
     }
-    */
 
     // summarize execution info for human consumption
-    // else {
+    else {
         hpx::cout
             << "Tree size = " << tnodes << ", "
             << "tree depth = " << mheight << ", "
@@ -408,7 +418,7 @@ void show_stats(double walltime, Stats const & stats)
             << "Performance = " << (tnodes / walltime) << " nodes/sec "
             << "(" << (tnodes / walltime / hpx::get_num_worker_threads()) << " nodes/sec per PE)\n"
             << "\n" << hpx::flush;
-    //}
+    }
 
     /*
     if (verbose > 1) {

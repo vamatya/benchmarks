@@ -14,12 +14,11 @@
 #include <benchmarks/uts/ws_stealstack.hpp>
 
 HPX_REGISTER_MINIMAL_COMPONENT_FACTORY(
-    hpx::components::simple_component< ::components::ws_stealstack>
+    hpx::components::managed_component< ::components::ws_stealstack>
   , ws_stealstack_component);
 
 int hpx_main(boost::program_options::variables_map & vm)
 {
-    std::cout << "startup complete\n";
     std::vector<hpx::id_type> stealstacks =
         create_stealstacks<components::ws_stealstack>(vm, "workstealing");
 
@@ -54,12 +53,9 @@ int hpx_main(boost::program_options::variables_map & vm)
     std::vector<components::ws_stealstack::stats> stats;
     stats.reserve(stealstacks.size());
     hpx::wait(stats_futures, stats);
-    show_stats(elapsed, stats);
+    show_stats(elapsed, stats, vm["verbose"].as<int>(), vm["chunk-size"].as<std::size_t>(), vm["overcommit-factor"].as<float>());
 
-    //return hpx::finalize();
-    hpx::terminate();
-
-    return 0;
+    return hpx::finalize();
 }
 
 int main(int argc, char* argv[])

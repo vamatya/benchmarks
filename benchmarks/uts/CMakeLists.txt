@@ -15,14 +15,13 @@ foreach(benchmark ${benchmarks})
       ${benchmark}.cpp rng/brg_sha1.cpp
       )
 
-  message(${sources})
   source_group("Source Files" FILES ${sources})
 
   # add example executable
   add_hpx_executable(${benchmark}
                      SOURCES ${sources} 
                      ${${benchmark}_FLAGS}
-                     COMPONENT_DEPENDENCIES iostreams distributing_factory
+                     COMPONENT_DEPENDENCIES iostreams
                      FOLDER "Benchmarks/Uts/${benchmark}")
 
   # add a custom target for this example

@@ -330,7 +330,6 @@ inline std::vector<hpx::id_type> create_stealstacks(
         result(boost::move(async_result.move()));
 
     std::size_t num_stealstacks = result.first;
-    std::cout << "num stealstacks: " << num_stealstacks << "\n";
     stealstacks.reserve(num_stealstacks);
     init_futures.reserve(num_stealstacks);
 

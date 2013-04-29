@@ -52,7 +52,7 @@ message(hpx::util::serialize_buffer<char> const& receive_buffer)
 HPX_PLAIN_ACTION(message);
 
 ///////////////////////////////////////////////////////////////////////////////
-double receive(hpx::naming::id_type dest, char * send_buffer, std::size_t size, std::size_t par)
+double receive(hpx::naming::id_type dest, char * send_buffer, std::size_t size, std::size_t window_size)
 {
     int loop = LOOP_LARGE;
     int skip = SKIP_LARGE;
@@ -62,7 +62,8 @@ double receive(hpx::naming::id_type dest, char * send_buffer, std::size_t size, 
 
     hpx::util::high_resolution_timer t;
 
-    std::vector<hpx::future<buffer_type> > recv_buffers(par);
+    std::vector<hpx::future<buffer_type> > recv_buffers;
+    recv_buffers.reserve(window_size);
 
     message_action msg;
     for (int i = 0; i != loop + skip; ++i) {
@@ -70,16 +71,16 @@ double receive(hpx::naming::id_type dest, char * send_buffer, std::size_t size, 
         if (i == skip)
             t.restart();
 
-        for(std::size_t j = 0; j < par; ++j)
+        for(std::size_t j = 0; j < window_size; ++j)
         {
-            recv_buffers[j] = hpx::async(msg, dest, buffer_type(send_buffer, size,
-                buffer_type::reference));
+            recv_buffers.push_back(hpx::async(msg, dest, buffer_type(send_buffer, size,
+                buffer_type::reference)));
         }
         hpx::wait(recv_buffers);
     }
 
     double elapsed = t.elapsed();
-    return (elapsed * 1e6) / (2 * loop * par);
+    return (elapsed * 1e6) / (2 * loop * window_size);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -106,31 +107,13 @@ void run_benchmark(boost::program_options::variables_map & vm)
     BOOST_ASSERT(align_size <= MAX_ALIGNMENT);
     char* send_buffer = align_buffer(send_buffer_orig, align_size);
 
-    std::size_t par = vm["par"].as<std::size_t>();
+    std::size_t window_size = vm["window-size"].as<std::size_t>();
 
     // perform actual measurements
     for (std::size_t size = 1; size <= MAX_MSG_SIZE; size *= 2)
     {
-        double latency = receive(there, send_buffer, size, par);
+        double latency = receive(there, send_buffer, size, window_size);
         hpx::cout << std::left << std::setw(10) << size
                   << latency << hpx::endl << hpx::flush;
     }
-}
-
-int hpx_main(boost::program_options::variables_map & vm)
-{
-    print_header();
-    run_benchmark(vm);
-    return hpx::finalize();
-}
-
-int main(int argc, char* argv[])
-{
-    boost::program_options::options_description
-        desc("Usage: " HPX_APPLICATION_STRING " [options]");
-
-    desc.add_options()
-        ("par", boost::program_options::value<std::size_t>()->default_value(1), "Number of messages to send in parallel");
-
-    return hpx::init(desc, argc, argv);
 }

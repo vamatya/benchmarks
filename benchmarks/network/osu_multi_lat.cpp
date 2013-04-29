@@ -1,9 +1,10 @@
 //  Copyright (c) 2013 Hartmut Kaiser
+//  Copyright (c) 2013 Thomas Heller
 //
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-// Bidirectional network bandwidth test
+// Multi latency network test
 
 #include <hpx/hpx_main.hpp>
 #include <hpx/hpx.hpp>
@@ -52,7 +53,7 @@ isend(hpx::util::serialize_buffer<char> const& receive_buffer)
 HPX_PLAIN_ACTION(isend);
 
 ///////////////////////////////////////////////////////////////////////////////
-double ireceive(hpx::naming::id_type dest, std::size_t size)
+double ireceive(hpx::naming::id_type dest, std::size_t size, std::size_t window_size)
 {
     int loop = LOOP_SMALL;
     int skip = SKIP_SMALL;
@@ -78,12 +79,20 @@ double ireceive(hpx::naming::id_type dest, std::size_t size)
             t.restart();
 
         typedef hpx::util::serialize_buffer<char> buffer_type;
-        send(dest, buffer_type(aligned_send_buffer, size,
-            buffer_type::reference));
+        std::vector<hpx::future<buffer_type> > send_futures;
+        send_futures.reserve(window_size);
+        for(std::size_t j = 0; j < window_size; ++j)
+        {
+            send_futures.push_back(
+                hpx::async(send, dest, buffer_type(aligned_send_buffer, size,
+                    buffer_type::reference))
+            );
+        }
+        hpx::wait(send_futures);
     }
 
     double elapsed = t.elapsed();
-    return (elapsed * 1e6) / (2 * loop);
+    return (elapsed * 1e6) / (2 * loop * window_size);
 }
 HPX_PLAIN_ACTION(ireceive);
 
@@ -96,23 +105,28 @@ void print_header()
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-void run_benchmark()
+void run_benchmark(boost::program_options::variables_map & vm)
 {
-    boost::uint32_t locality_id = hpx::get_locality_id();
     std::vector<hpx::id_type> localities = hpx::find_all_localities();
 
     std::size_t pairs = localities.size() / 2;
-    std::size_t max_pairs = pairs + localities.size() % 2;
 
     for (std::size_t size = 1; size <= MAX_MSG_SIZE; size *= 2)
     {
         std::vector<hpx::future<double> > benchmarks;
 
-        for (boost::uint32_t locality_id = 0; locality_id != max_pairs; ++locality_id) 
+        for (boost::uint32_t locality_id = 0; locality_id != localities.size(); ++locality_id) 
         {
             ireceive_action receive;
+
+            boost::uint32_t partner = 0;
+            if(locality_id < pairs)
+                partner = locality_id + pairs;
+            else
+                partner = locality_id - pairs;
+
             benchmarks.push_back(hpx::async(receive,
-                localities[locality_id], localities[locality_id + pairs], size));
+                localities[locality_id], localities[partner], size, vm["window-size"].as<std::size_t>()));
         }
 
         double total_latency = 0;
@@ -124,14 +138,7 @@ void run_benchmark()
         }
 
         hpx::cout << std::left << std::setw(10) << size
-                  << total_latency / (2. * max_pairs)
+                  << total_latency / (2. * pairs)
                   << hpx::endl << hpx::flush;
     }
-}
-
-int main(int argc, char* argv[])
-{
-    print_header();
-    run_benchmark();
-    return 0;
 }

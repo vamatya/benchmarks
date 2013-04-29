@@ -1,4 +1,5 @@
 //  Copyright (c) 2013 Hartmut Kaiser
+//  Copyright (c) 2013 Thomas Heller
 //
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -30,11 +31,9 @@ unsigned long getpagesize()
 
 ///////////////////////////////////////////////////////////////////////////////
 #define LOOP_SMALL  100
-#define WINDOW_SIZE_SMALL  64
 #define SKIP_SMALL  10
 
 #define LOOP_LARGE  20
-#define WINDOW_SIZE_LARGE  64
 #define SKIP_LARGE  2
 
 #define LARGE_MESSAGE_SIZE  8192
@@ -50,16 +49,14 @@ void isend(hpx::util::serialize_buffer<char> const& receive_buffer) {}
 HPX_PLAIN_ACTION(isend);
 
 ///////////////////////////////////////////////////////////////////////////////
-double ireceive(hpx::naming::id_type dest, std::size_t size)
+double ireceive(hpx::naming::id_type dest, std::size_t size, std::size_t window_size)
 {
     int loop = LOOP_SMALL;
     int skip = SKIP_SMALL;
-    int window_size = WINDOW_SIZE_SMALL;
 
     if (size > LARGE_MESSAGE_SIZE) {
         loop = LOOP_LARGE;
         skip = SKIP_LARGE;
-        window_size = WINDOW_SIZE_LARGE;
     }
 
     // align used buffers on page boundaries
@@ -70,7 +67,7 @@ double ireceive(hpx::naming::id_type dest, std::size_t size)
     std::memset(aligned_send_buffer, 'a', size);
 
     hpx::util::high_resolution_timer t;
-    for (int i = 0; i != loop + skip; ++i) {
+    for (std::size_t i = 0; i != loop + skip; ++i) {
         // do not measure warm up phase
         if (i == skip)
             t.restart();
@@ -94,7 +91,6 @@ double ireceive(hpx::naming::id_type dest, std::size_t size)
     double elapsed = t.elapsed();
     return (size / 1e6 * loop * window_size) / elapsed;
 }
-HPX_PLAIN_ACTION(ireceive);
 
 ///////////////////////////////////////////////////////////////////////////////
 void print_header ()
@@ -104,7 +100,7 @@ void print_header ()
               << hpx::flush;
 }
 
-void run_benchmark()
+void run_benchmark(boost::program_options::variables_map & vm)
 {
     // use the first remote locality to bounce messages, if possible
     hpx::id_type here = hpx::find_here();
@@ -115,18 +111,10 @@ void run_benchmark()
         there = localities[0];
 
     // perform actual measurements
-    ireceive_action receive;
     for (std::size_t size = 1; size <= MAX_MSG_SIZE; size *= 2)
     {
-        double bw = receive(here, there, size);
+        double bw = ireceive(there, size, vm["window-size"].as<std::size_t>());
         hpx::cout << std::left << std::setw(10) << size
                   << bw << hpx::endl << hpx::flush;
     }
-}
-
-int main(int argc, char* argv[])
-{
-    print_header();
-    run_benchmark();
-    return 0;
 }

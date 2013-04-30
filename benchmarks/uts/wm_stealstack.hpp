@@ -156,6 +156,7 @@ namespace components
             local_work++;
             std::size_t local_work_tmp = local_work;
             stat.max_stack_depth = (std::max)(local_work_tmp, stat.max_stack_depth);
+            distribute_work();
         }
 
         void distribute_work()
@@ -164,27 +165,42 @@ namespace components
 
             if(local_work > param.chunk_size * param.chunk_size)
             {
-                mutex_type::scoped_lock lk(local_queue_mtx);
-                last_share = (last_share + 1) % size;
-                if(last_share == rank) last_share = (last_share + 1) % size;
-
-                std::size_t steal_num = local_queue.size()/2;
                 std::vector<stealstack_node> nodes;
-                nodes.resize(steal_num);
-                for(std::size_t i = 0; i < steal_num; ++i)
+                std::size_t idx = 0;
                 {
-                    std::swap(nodes[i], local_queue.back());
-                    local_queue.pop_back();
-
-                    if(local_work < nodes[i].work.size())
+                    mutex_type::scoped_lock lk(local_queue_mtx);
+                    /*
+                    if(!need_work.empty())
                     {
-                        throw std::logic_error(
-                            "gen_children(): local_work count is less than 0!");
+                        std::set<std::size_t>::iterator it = need_work.begin();
+                        idx = *it;
+                        need_work.erase(it);
                     }
-                    local_work -= nodes[i].work.size();
-                    work_shared += nodes[i].work.size();
+                    else
+                    */
+                    {
+                        last_share = (last_share + 1) % size;
+                        if(last_share == rank) last_share = (last_share + 1) % size;
+                        idx = last_share;
+                    }
+
+                    std::size_t steal_num = local_queue.size()/2;
+                    nodes.resize(steal_num);
+                    for(std::size_t i = 0; i < steal_num; ++i)
+                    {
+                        std::swap(nodes[i], local_queue.back());
+                        local_queue.pop_back();
+
+                        if(local_work < nodes[i].work.size())
+                        {
+                            throw std::logic_error(
+                                "gen_children(): local_work count is less than 0!");
+                        }
+                        local_work -= nodes[i].work.size();
+                        work_shared += nodes[i].work.size();
+                    }
                 }
-                hpx::apply<share_work_action>(ids[last_share], rank, nodes);
+                hpx::apply<share_work_action>(ids[idx], rank, nodes);
             }
         }
 
@@ -219,7 +235,6 @@ namespace components
             {
                 ++stat.n_leaves;
             }
-            distribute_work();
         }
 
         void share_work(std::size_t src, std::vector<stealstack_node> const & work)
@@ -258,6 +273,18 @@ namespace components
                 if(rank == size-1 && dir == +1) return false;
                 return wm_stealstack::got_work_action()(ids[rank + dir], rank, dir);
             }
+
+            /*
+            {
+                mutex_type::scoped_lock lk(local_queue_mtx);
+                std::set<std::size_t>::iterator it = need_work.find(src);
+                if(it == need_work.end())
+                {
+                    need_work.insert(src);
+                }
+            }
+            */
+
             return true;
         }
         
@@ -344,13 +371,26 @@ namespace components
         void tree_search()
         {
             std::vector<node> parents;
+            /*
+            std::vector<hpx::future<void> > gen_children_futures;
+            gen_children_futures.reserve(param.chunk_size);
+            */
             while(get_work(parents))
             {
                 BOOST_FOREACH(node & parent, parents)
                 {
+                    /*
+                    gen_children_futures.push_back(
+                        hpx::async(&wm_stealstack::gen_children, this, parent)
+                    );
+                    */
                     gen_children(parent);
                 }
                 parents.clear();
+                /*
+                hpx::wait(gen_children_futures);
+                gen_children_futures.clear();
+                */
             }
         }
 
@@ -367,6 +407,7 @@ namespace components
         std::vector<hpx::id_type> ids;
         boost::atomic<std::size_t> local_work;
         boost::atomic<std::size_t> work_shared;
+        std::set<std::size_t> need_work;
 
         stats stat;
 

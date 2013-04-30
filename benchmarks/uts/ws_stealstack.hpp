@@ -301,13 +301,22 @@ namespace components
         void tree_search()
         {
             std::vector<node> parents;
+            std::vector<hpx::future<void> > gen_children_futures;
+            gen_children_futures.reserve(param.chunk_size);
             while(get_work(parents))
             {
                 BOOST_FOREACH(node & parent, parents)
                 {
+                    gen_children_futures.push_back(
+                        hpx::async(&ws_stealstack::gen_children, this, parent)
+                    );
+                    /*
                     gen_children(parent);
+                    */
                 }
                 parents.clear();
+                hpx::wait(gen_children_futures);
+                gen_children_futures.clear();
             }
         }
 

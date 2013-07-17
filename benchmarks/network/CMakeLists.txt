@@ -39,7 +39,8 @@ endforeach()
 
 set(coll_benchmarks
     osu_bcast
-    osu_scatter)
+    #osu_scatter
+    )
 
 foreach(benchmark ${coll_benchmarks})
   set(sources

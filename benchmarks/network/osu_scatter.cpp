@@ -22,7 +22,7 @@ void scatter(std::vector<hpx::id_type> const & localities, hpx::util::serialize_
 {
     std::vector<hpx::future<void> > scatter_futures;
     scatter_futures.reserve(localities.size() / chunk_size);
-        
+
     typedef std::vector<hpx::id_type>::const_iterator iterator;
     iterator begin = localities.cbegin() + 1;
 
@@ -61,7 +61,7 @@ void run_benchmark(params const & p)
 {
     std::size_t skip = SKIP;
     std::size_t iterations = p.iterations;
-    
+
     std::vector<hpx::id_type> localities = hpx::find_all_localities();
 
     if(localities.size() < 2)
@@ -69,7 +69,7 @@ void run_benchmark(params const & p)
         hpx::cout << "This benchmark must be run with at least 2 localities" << hpx::endl << hpx::flush;
         return;
     }
-        
+
     std::vector<char> send_buffer(p.max_msg_size);
 
     for(std::size_t size = 1; size <= p.max_msg_size; size *=2)

@@ -235,7 +235,8 @@ distribute_stealstacks(std::vector<hpx::id_type> localities, float overcommit_fa
 
     std::size_t worker_threads = hpx::get_os_thread_count();
 
-    std::size_t num_stealstacks = worker_threads * overcommit_factor;
+    std::size_t num_stealstacks =
+        static_cast<std::size_t>(worker_threads * overcommit_factor);
 
     typedef hpx::future<std::vector<hpx::naming::gid_type> > future_type;
 

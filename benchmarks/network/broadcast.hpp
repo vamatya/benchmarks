@@ -13,10 +13,12 @@
     ::hpx::lcos::broadcast<BOOST_PP_CAT(BOOST_PP_CAT(NAME, _), _action)> NAME;  \
 /**/
 
-namespace hpx { namespace lcos {
+namespace hpx { namespace lcos
+{
     namespace detail
     {
-        void broadcast_impl(std::vector<hpx::id_type> ids, hpx::util::function<void(hpx::id_type)> fun, std::size_t fan_out = 2);
+        void broadcast_impl(std::vector<hpx::id_type> ids,
+            hpx::util::function<void(hpx::id_type)> fun, std::size_t fan_out = 2);
         HPX_DEFINE_PLAIN_ACTION(broadcast_impl, broadcast_impl_action);
     }
 
@@ -25,13 +27,13 @@ namespace hpx { namespace lcos {
     {
         broadcast()
           : ready_future(ready_promise.get_future())
-          , bcast_future(hpx::lcos::make_future())
+          , bcast_future(hpx::lcos::make_ready_future())
         {}
 
         explicit broadcast(hpx::id_type id, std::size_t fan_out = 2)
           : this_id(id)
           , ready_future(ready_promise.get_future())
-          , bcast_future(hpx::lcos::make_future())
+          , bcast_future(hpx::lcos::make_ready_future())
         {}
 
         template <typename A0>
@@ -73,7 +75,7 @@ namespace hpx { namespace lcos {
                           , fan_out
                         );
                 }
-                return hpx::lcos::make_future(a0);
+                return hpx::lcos::make_ready_future(a0);
             }
             else
             {
@@ -119,7 +121,7 @@ namespace hpx { namespace lcos {
         {
             // Call some action for the fan_out first ids here ...
             std::vector<hpx::future<void> > broadcast_futures;
-            broadcast_futures.reserve(std::min(ids.size(), fan_out));
+            broadcast_futures.reserve((std::min)(ids.size(), fan_out));
             for(std::size_t i = 0; i < (std::min)(fan_out, ids.size()); ++i)
             {
                 broadcast_futures.push_back(

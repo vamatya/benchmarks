@@ -119,7 +119,7 @@ void run_benchmark(boost::program_options::variables_map & vm)
         {
             ireceive_action receive;
 
-            boost::uint32_t partner = 0;
+            std::size_t partner = 0;
             if(locality_id < pairs)
                 partner = locality_id + pairs;
             else

@@ -96,7 +96,7 @@ distribute_component(std::vector<hpx::id_type> localities, hpx::components::comp
     future_type f;
     {
         hpx::lcos::packaged_action<action_type, std::vector<hpx::naming::gid_type> > p;
-        p.apply(this_loc, type, num_components);
+        p.apply(hpx::launch::async, this_loc, type, num_components);
         f = p.get_future();
     }
 
@@ -114,7 +114,7 @@ distribute_component(std::vector<hpx::id_type> localities, hpx::components::comp
         {
             hpx::lcos::packaged_action<distribute_component_action, result_type > p;
             hpx::id_type id = locs_first[0];
-            p.apply(id, boost::move(locs_first), type);
+            p.apply(hpx::launch::async, id, boost::move(locs_first), type);
             components_futures.push_back(
                 p.get_future()
             );
@@ -124,7 +124,7 @@ distribute_component(std::vector<hpx::id_type> localities, hpx::components::comp
         {
             hpx::lcos::packaged_action<distribute_component_action, result_type > p;
             hpx::id_type id = locs_second[0];
-            p.apply(id, boost::move(locs_second), type);
+            p.apply(hpx::launch::async, id, boost::move(locs_second), type);
             components_futures.push_back(
                 p.get_future()
             );

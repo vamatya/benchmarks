@@ -35,9 +35,9 @@ struct broadcast_component
         ids = id;
         send_buffer = std::vector<char>(max_msg_size);
     }
-    
+
     HPX_DEFINE_COMPONENT_ACTION(broadcast_component, init);
-    
+
     typedef hpx::util::serialize_buffer<char> buffer_type;
 
     double run(std::size_t size, std::size_t iterations, std::size_t skip)
@@ -46,7 +46,7 @@ struct broadcast_component
         for(std::size_t i = 0; i < iterations + skip; ++i)
         {
             hpx::util::high_resolution_timer t;
-        
+
             recv_buffer = bcast(ids, 0, buffer_type(&send_buffer[0], size, buffer_type::reference)).move();
 
             double t_elapsed = t.elapsed();
@@ -55,14 +55,14 @@ struct broadcast_component
                 elapsed += t_elapsed;
             }
         }
-        
+
         double latency = (elapsed * 1e6) / iterations;
 
         return latency;
     }
 
     HPX_DEFINE_COMPONENT_ACTION(broadcast_component, run);
-    
+
     HPX_DEFINE_COMPONENT_BROADCAST(bcast, buffer_type);
     std::vector<hpx::id_type> ids;
     std::vector<char> send_buffer;
@@ -78,7 +78,7 @@ void run_benchmark(params const & p)
 {
     std::size_t skip = SKIP;
     std::size_t iterations = p.iterations;
-    
+
     std::vector<hpx::id_type> ids = create_components<broadcast_component>(p);
 
     if(ids.size() < 2)

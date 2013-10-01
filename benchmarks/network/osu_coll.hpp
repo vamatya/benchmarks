@@ -139,13 +139,25 @@ distribute_component(std::vector<hpx::id_type> localities, hpx::components::comp
 
     while(!components_futures.empty())
     {
-        HPX_STD_TUPLE<int, hpx::future<result_type> >
-            ss_res = hpx::wait_any(components_futures);
+        std::vector<hpx::future<result_type> > fv_ret
+            = hpx::wait_any(components_futures);
 
-        result_type r = boost::move(HPX_STD_GET(1, ss_res).move());
+        std::size_t ct = 0, pos = 0;
+
+        BOOST_FOREACH(hpx::future<result_type> f, fv_ret)
+        {
+            if(f.is_ready())
+            {
+                pos = ct;
+                break;
+            }
+            ++ct;
+        }
+
+        result_type r = fv_ret.at(pos).get();
         res.second.insert(res.second.end(), r.second.begin(), r.second.end());
         res.first += r.first;
-        components_futures.erase(components_futures.begin() + HPX_STD_GET(0, ss_res));
+        components_futures.erase(components_futures.begin() + pos);
     }
 
     return res;

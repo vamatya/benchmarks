@@ -320,12 +320,24 @@ namespace components
                 bool terminate = true;
                 while(!terminate_futures.empty())
                 {
-                    HPX_STD_TUPLE<int, hpx::future<bool> > terminate_res = hpx::wait_any(terminate_futures);
-                    if(HPX_STD_GET(1, terminate_res).get() == true)
+                    std::vector<hpx::lcos::future<bool> > terminate_res_vec 
+                        = hpx::wait_any(terminate_futures);
+                    std::size_t ct = 0, pos = 0;
+
+                    BOOST_FOREACH(hpx::lcos::future<bool> f, terminate_res_vec)
                     {
-                        terminate = false;
+                        if(f.is_ready())
+                        {
+                            pos = ct; 
+                            if(f.get() == true)
+                            {
+                                terminate = false;
+                            }
+                            break;
+                        }
+                        ++ct;
                     }
-                    terminate_futures.erase(terminate_futures.begin() + HPX_STD_GET(0, terminate_res));
+                    terminate_futures.erase(terminate_futures.begin() + pos);
                 }
 
                 if(terminate) return false;

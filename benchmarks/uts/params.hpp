@@ -87,12 +87,12 @@ struct params
         char strBuf[1024];
         rng_showtype(strBuf, 0);
 
-
+        hpx::lcos::future<boost::uint32_t> locs = hpx::get_num_localities();
         hpx::cout
             << "Random number generator: " << strBuf << "\n"
             << "Compute granularity: " << compute_granularity << "\n"
             << "Execution strategy: "
-            << "Parallel search using " << hpx::get_num_localities() << " localities "
+            << "Parallel search using " << locs.get() << " localities "
             << "with a total of " << num_threads << " threads\n"
             << "Load balance by " << name << ", chunk size = " << chunk_size << " nodes\n"
             << "Polling Interval: " << polling_interval << "\n\n"
@@ -286,13 +286,25 @@ distribute_stealstacks(std::vector<hpx::id_type> localities, float overcommit_fa
 
     while(!stealstacks_futures.empty())
     {
-        HPX_STD_TUPLE<int, hpx::future<result_type> >
-            ss_res = hpx::wait_any(stealstacks_futures);
+        std::vector<hpx::lcos::future<result_type> >
+            fv_ret = hpx::wait_any(stealstacks_futures);
 
-        result_type r = boost::move(HPX_STD_GET(1, ss_res).move());
+        std::size_t ct = 0, pos = 0;
+
+        BOOST_FOREACH(hpx::lcos::future<result_type> f, fv_ret)
+        {
+            if(f.is_ready())
+            {
+                pos = ct;
+                break;
+            }
+            ++ct;
+        }
+
+        result_type r = fv_ret.at(pos).get();
         res.second.insert(res.second.end(), r.second.begin(), r.second.end());
         res.first += r.first;
-        stealstacks_futures.erase(stealstacks_futures.begin() + HPX_STD_GET(0, ss_res));
+        stealstacks_futures.erase(stealstacks_futures.begin() + pos);
     }
 
     return res;

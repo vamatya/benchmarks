@@ -356,7 +356,7 @@ inline std::vector<hpx::id_type> create_stealstacks(
     BOOST_FOREACH(hpx::id_type id, hpx::util::locality_results(res))
     {
         init_futures.push_back(
-            hpx::async<typename StealStack::init_action>(id, p, i, num_stealstacks)
+            hpx::async<typename StealStack::init_action>(id, p, i, num_stealstacks, id)
         );
         stealstacks.push_back(id);
         ++i;

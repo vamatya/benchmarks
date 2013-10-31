@@ -94,11 +94,12 @@ namespace components
         typedef hpx::lcos::local::spinlock mutex_type;
         mutex_type local_queue_mtx;
 
-        void init(params p, std::size_t r, std::size_t s)
+        void init(params p, std::size_t r, std::size_t s, hpx::naming::id_type id)
         {
             rank = r;
             size = s;
             param = p;
+            my_id = id;
 
             last_steal = rank;
             last_share = rank;
@@ -420,6 +421,7 @@ namespace components
         boost::atomic<std::size_t> local_work;
         boost::atomic<std::size_t> work_shared;
         std::set<std::size_t> need_work;
+        hpx::id_type my_id;
 
         stats stat;
 

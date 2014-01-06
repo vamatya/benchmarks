@@ -16,17 +16,13 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 #define MESSAGE_ALIGNMENT 64
-#define MAX_ALIGNMENT 65536
-#define MAX_MSG_SIZE (1<<22)
-#define SEND_BUFSIZE (MAX_MSG_SIZE + MAX_ALIGNMENT)
+#define MAX_ALIGNMENT 512
 
 #define LOOP_LARGE  100
 #define SKIP_LARGE  10
 
-#define LARGE_MESSAGE_SIZE  8192
 
-
-char send_buffer_orig[SEND_BUFSIZE];
+char *send_buffer_orig;
 
 ///////////////////////////////////////////////////////////////////////////////
 char* align_buffer (char* ptr, unsigned long align_size)
@@ -51,10 +47,17 @@ message(hpx::util::serialize_buffer<char> const& receive_buffer)
 }
 HPX_PLAIN_ACTION(message);
 
+HPX_REGISTER_BASE_LCO_WITH_VALUE_DECLARATION(hpx::util::serialize_buffer<char>, serialization_buffer_char);
+HPX_REGISTER_BASE_LCO_WITH_VALUE(hpx::util::serialize_buffer<char>, serialization_buffer_char);
+
 ///////////////////////////////////////////////////////////////////////////////
-double receive(hpx::naming::id_type dest, char * send_buffer, std::size_t size, std::size_t window_size)
+double receive(
+    hpx::naming::id_type dest,
+    char * send_buffer,
+    std::size_t size,
+    std::size_t loop,
+    std::size_t window_size)
 {
-    int loop = LOOP_LARGE;
     int skip = SKIP_LARGE;
 
     typedef hpx::util::serialize_buffer<char> buffer_type;
@@ -63,7 +66,7 @@ double receive(hpx::naming::id_type dest, char * send_buffer, std::size_t size, 
     hpx::util::high_resolution_timer t;
 
     std::vector<hpx::future<buffer_type> > recv_buffers;
-    recv_buffers.reserve(window_size);
+    recv_buffers.resize(window_size);
 
     message_action msg;
     for (int i = 0; i != loop + skip; ++i) {
@@ -73,8 +76,8 @@ double receive(hpx::naming::id_type dest, char * send_buffer, std::size_t size, 
 
         for(std::size_t j = 0; j < window_size; ++j)
         {
-            recv_buffers.push_back(hpx::async(msg, dest, buffer_type(send_buffer, size,
-                buffer_type::reference)));
+            recv_buffers[j] = hpx::async(msg, dest, buffer_type(send_buffer, size,
+                buffer_type::reference));
         }
         hpx::wait(recv_buffers);
     }
@@ -101,19 +104,29 @@ void run_benchmark(boost::program_options::variables_map & vm)
     std::vector<hpx::id_type> localities = hpx::find_remote_localities();
     if (!localities.empty())
         there = localities[0];
+
+    std::size_t window_size = vm["window-size"].as<std::size_t>();
+    std::size_t loop = vm["loop"].as<std::size_t>();
+    std::size_t min_size = vm["min-size"].as<std::size_t>();
+    std::size_t max_size = vm["max-size"].as<std::size_t>();
+
+    if(max_size < min_size) std::swap(max_size, min_size);
     
     // align used buffers on page boundaries
     unsigned long align_size = getpagesize();
-    BOOST_ASSERT(align_size <= MAX_ALIGNMENT);
+    //BOOST_ASSERT(align_size <= MAX_ALIGNMENT);
+    send_buffer_orig = new char[max_size + align_size];
     char* send_buffer = align_buffer(send_buffer_orig, align_size);
 
-    std::size_t window_size = vm["window-size"].as<std::size_t>();
-
+    hpx::util::high_resolution_timer timer;
     // perform actual measurements
-    for (std::size_t size = 1; size <= MAX_MSG_SIZE; size *= 2)
+    for (std::size_t size = min_size; size <= max_size; size *= 2)
     {
-        double latency = receive(there, send_buffer, size, window_size);
+        double latency = receive(there, send_buffer, size, loop, window_size);
         hpx::cout << std::left << std::setw(10) << size
                   << latency << hpx::endl << hpx::flush;
     }
+    hpx::cout << "Total time: " << timer.elapsed_nanoseconds() << "\n" << hpx::flush;
+    delete[] send_buffer_orig;
+
 }

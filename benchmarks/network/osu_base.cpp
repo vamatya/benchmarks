@@ -27,7 +27,16 @@ int main(int argc, char* argv[])
     desc.add_options()
         ("window-size",
          boost::program_options::value<std::size_t>()->default_value(1),
-         "Number of messages to send in parallel");
+         "Number of messages to send in parallel")
+        ("loop",
+         boost::program_options::value<std::size_t>()->default_value(100),
+         "Number of loops")
+        ("min-size",
+         boost::program_options::value<std::size_t>()->default_value(1),
+         "Minimum size of message to send")
+        ("max-size",
+         boost::program_options::value<std::size_t>()->default_value((1<<22)),
+         "Maximum size of message to send");
 
     return hpx::init(desc, argc, argv);
 }

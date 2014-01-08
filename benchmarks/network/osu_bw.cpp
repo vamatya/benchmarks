@@ -39,10 +39,7 @@ unsigned long getpagesize()
 #define LARGE_MESSAGE_SIZE  8192
 
 #define MAX_MSG_SIZE (1<<22)
-#define MAX_ALIGNMENT 65536
-#define SEND_BUFSIZE (MAX_MSG_SIZE + MAX_ALIGNMENT)
 
-char send_buffer[SEND_BUFSIZE];
 
 ///////////////////////////////////////////////////////////////////////////////
 void isend(hpx::util::serialize_buffer<char> const& receive_buffer) {}
@@ -63,32 +60,35 @@ double ireceive(hpx::naming::id_type dest, std::size_t size, std::size_t window_
     unsigned long align_size = getpagesize();
     BOOST_ASSERT(align_size <= MAX_ALIGNMENT);
 
-    char* aligned_send_buffer = align_buffer(send_buffer, align_size);
-    std::memset(aligned_send_buffer, 'a', size);
+    char *send_buffer = new char[size];
+    std::memset(send_buffer, 'a', size);
 
     hpx::util::high_resolution_timer t;
+
+    std::vector<hpx::future<void> > lazy_results;
+    lazy_results.resize(window_size);
+    isend_action send;
     for (std::size_t i = 0; i != loop + skip; ++i) {
         // do not measure warm up phase
         if (i == skip)
             t.restart();
 
-        std::vector<hpx::future<void> > lazy_results;
-        lazy_results.reserve(window_size);
-
-        isend_action send;
         for (int j = 0; j < window_size; ++j)
         {
             typedef hpx::util::serialize_buffer<char> buffer_type;
 
             // Note: The original benchmark uses MPI_Isend which does not
             //       create a copy of the passed buffer.
-            lazy_results.push_back(hpx::async(send, dest,
-                buffer_type(aligned_send_buffer, size, buffer_type::reference)));
+            lazy_results[j] = hpx::async(send, dest,
+                buffer_type(send_buffer, size, buffer_type::reference));
         }
         hpx::wait_all(lazy_results);
     }
 
     double elapsed = t.elapsed();
+
+    delete[] send_buffer;
+
     return (size / 1e6 * loop * window_size) / elapsed;
 }
 

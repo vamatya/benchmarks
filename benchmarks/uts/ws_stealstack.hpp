@@ -140,7 +140,7 @@ namespace components
             if(param.chunk_size * param.chunk_size > local_work)
             {
                 {
-                    mutex_type::scoped_lock lk(local_queue_mtx);
+                    mutex_type::scoped_lock lk(local_queue_mtx);	//###############
                     /* If the stack is empty, push an empty stealstack_node. */
                     if(local_queue.empty())
                     {
@@ -171,7 +171,7 @@ namespace components
             else
             {
                 {
-                    mutex_type::scoped_lock lk(shared_queue_mtx);
+                    mutex_type::scoped_lock lk(shared_queue_mtx);	//################
                     /* If the shared stack is empty, push an empty stealstack_node. */
                     if(shared_queue.empty())
                     {
@@ -248,7 +248,7 @@ namespace components
             if(lq_shared_work > param.chunk_size * param.chunk_size)
             {
                 //mutex_type::scoped_lock lk(local_queue_mtx);
-                mutex_type::scoped_lock lk(shared_queue_mtx);
+                mutex_type::scoped_lock lk(shared_queue_mtx); //#####################
                 //std::size_t steal_num = local_queue.size()/2;
                 /* Half of shared queue is stolen */
                 
@@ -321,7 +321,7 @@ namespace components
 
         bool work_present()
         {
-            mutex_type::scoped_lock lk(check_work_mtx);
+            mutex_type::scoped_lock lk(check_work_mtx);	//##################
             if(local_work > 0 || lq_shared_work > 0)
                 return true;
             else 
@@ -382,7 +382,7 @@ namespace components
                             {
                                 if(ss_node.work.size() > 0)
                                 {
-                                    mutex_type::scoped_lock lk(local_queue_mtx);
+                                    mutex_type::scoped_lock lk(local_queue_mtx); //#################
                                     terminate = false;
 
                                     local_queue.push_back(ss_node);
@@ -434,7 +434,7 @@ namespace components
             }
 
             {
-                mutex_type::scoped_lock lk(local_queue_mtx);
+                mutex_type::scoped_lock lk(local_queue_mtx); //##################
                 std::swap(work, local_queue.front().work);
                 local_queue.pop_front();
             }

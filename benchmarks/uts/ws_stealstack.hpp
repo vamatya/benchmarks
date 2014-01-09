@@ -309,7 +309,7 @@ namespace components
                 {
                     gen_children_futures.push_back(
                         hpx::async(hpx::util::bind(
-							&ws_stealstack::gen_children, this, parent))
+                            &ws_stealstack::gen_children, this, parent))
                     );
                     /*
                     gen_children(parent);

@@ -286,31 +286,27 @@ distribute_stealstacks(std::vector<hpx::id_type> localities, float overcommit_fa
 
     while(!stealstacks_futures.empty())
     {
-        //std::vector<hpx::lcos::future<result_type> >
-        //    fv_ret = hpx::wait_any(stealstacks_futures);		
-		hpx::wait_any(stealstacks_futures);
+        hpx::wait_any(stealstacks_futures);
 
         std::size_t ct = 0;
-		std::vector<std::size_t> pos;
+        std::vector<std::size_t> pos;
 
-        //BOOST_FOREACH(hpx::lcos::future<result_type> f, fv_ret)
-		BOOST_FOREACH(hpx::lcos::future<result_type> f, stealstacks_futures)
+        BOOST_FOREACH(hpx::lcos::future<result_type> f, stealstacks_futures)
         {
             if(f.is_ready())
             {
                 pos.push_back(ct);
-                //break;
             }
             ++ct;
         }
 
-		BOOST_FOREACH(std::size_t i, pos)
-		{
-			result_type r = stealstacks_futures.at(i).get();
-			res.second.insert(res.second.end(), r.second.begin(), r.second.end());
-			res.first += r.first;
-			stealstacks_futures.erase(stealstacks_futures.begin() + i);
-		}
+        BOOST_FOREACH(std::size_t i, pos)
+        {
+            result_type r = stealstacks_futures.at(i).get();
+            res.second.insert(res.second.end(), r.second.begin(), r.second.end());
+            res.first += r.first;
+            stealstacks_futures.erase(stealstacks_futures.begin() + i);
+        }
     }
 
     return res;

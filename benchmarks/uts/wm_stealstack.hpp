@@ -320,16 +320,16 @@ namespace components
 
                 bool terminate = true;
                 while(!terminate_futures.empty())
-                {
-                    std::vector<hpx::lcos::future<bool> > terminate_res_vec 
-                        = hpx::wait_any(terminate_futures);
-                    std::size_t ct = 0, pos = 0;
+                {   
+                    hpx::wait_any(terminate_futures);
+                    std::size_t ct = 0;
+                    std::vector<std::size_t> pos;
 
-                    BOOST_FOREACH(hpx::lcos::future<bool> f, terminate_res_vec)
+                    BOOST_FOREACH(hpx::lcos::future<bool> f, terminate_futures)
                     {
                         if(f.is_ready())
-                        {
-                            pos = ct; 
+                        {   
+                            pos.push_back(ct);
                             if(f.get() == true)
                             {
                                 terminate = false;
@@ -338,7 +338,12 @@ namespace components
                         }
                         ++ct;
                     }
-                    terminate_futures.erase(terminate_futures.begin() + pos);
+
+                    BOOST_FOREACH(std::size_t i, pos)
+                    {
+                        terminate_futures.erase(terminate_futures.begin() + i);
+                    }
+                    
                 }
 
                 if(terminate) return false;

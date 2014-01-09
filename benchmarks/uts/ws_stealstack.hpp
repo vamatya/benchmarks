@@ -308,7 +308,8 @@ namespace components
                 BOOST_FOREACH(node & parent, parents)
                 {
                     gen_children_futures.push_back(
-                        hpx::async(&ws_stealstack::gen_children, this, parent)
+                        hpx::async(hpx::util::bind(
+							&ws_stealstack::gen_children, this, parent))
                     );
                     /*
                     gen_children(parent);

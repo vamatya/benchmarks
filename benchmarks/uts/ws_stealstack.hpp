@@ -11,6 +11,8 @@
 #include <hpx/include/async.hpp>
 #include <hpx/include/components.hpp>
 
+#include <boost/ref.hpp>
+
 namespace components
 {
     struct ws_stealstack
@@ -469,8 +471,8 @@ namespace components
                 BOOST_FOREACH(node & parent, parents)
                 {
                     gen_children_futures.push_back(
-                        hpx::async(hpx::util::bind(
-                            &ws_stealstack::gen_children, this, parent))
+                        hpx::async(&ws_stealstack::gen_children, this
+                            , boost::ref(parent))
                     );
                     //hpx::future<void> gen_child_fut = hpx::async(&ws_stealstack::gen_children, this, parent);
                     //gen_child_fut.get();

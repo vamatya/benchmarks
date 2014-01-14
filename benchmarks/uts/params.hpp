@@ -312,17 +312,48 @@ distribute_stealstacks(std::vector<hpx::id_type> localities, float overcommit_fa
     return res;
 }
 
+inline std::vector<hpx::id_type> distribute_sharedq(
+    std::vector<id_type> localities, hpx::components::component_type sharedq_type)
+{
+
+    typedef
+        hpx::components::server::runtime_support::bulk_create_components_action
+        action_type;
+
+    typedef hpx::future<hpx::id_type> future_type;
+    std::vector<future_type> f_vec;
+    std::vector<hpx::id_type> res_vec;
+
+    BOOST_FOREACH(hpx::id_type loc, localities)
+    {
+        hpx::lcos::packaged_action<action_type, std::vector<hpx::naming::gid_type> > p;
+        p.apply(hpx::launch::async, loc, sharedq_type, 1);
+        f_vec.push_back(p.get_future())
+        //f = p.get_future();
+    }
+
+    BOOST_FOREACH(future_type f, f_vec)
+    {
+        res_vec.push_back(boost::move(f.move()));
+    }
+
+    return res_vec;
+}
+
+HPX_PLAIN_ACTION(distribute_sharedq);
+
 template <typename StealStack>
 inline std::vector<hpx::id_type> create_stealstacks(
     boost::program_options::variables_map & vm, const char * name)
 {
     float overcommit_factor = vm["overcommit-factor"].as<float>();
 
+    typename std::vector<hpx::id_type> id_vector_type;
 
     hpx::components::component_type type =
         hpx::components::get_component_type<StealStack>();
     
-    std::vector<hpx::id_type> localities = hpx::find_all_localities(type);
+    id_vector_type localities = hpx::find_all_localities(type);
 
 
     using hpx::components::distributing_factory;
@@ -336,7 +367,7 @@ inline std::vector<hpx::id_type> create_stealstacks(
 
     p.print(name);
 
-    std::vector<hpx::id_type> stealstacks;
+    id_vector_type stealstacks;
 
     std::vector<hpx::future<void> > init_futures;
 
@@ -355,10 +386,34 @@ inline std::vector<hpx::id_type> create_stealstacks(
         res.push_back(rl);
     }
 
+    // Create one shared queue component per locality
+    hpx::components::component_type sharedq_type = 
+        hpx::components::get_component_type<hpx::components::shared_queue>();
+    hpx::future<std::vector<hpx::id_type> > async_sharedq_res = 
+        hpx::async<distribute_sharedq_action>(
+            id, boost::move(localities), sharedq_type);
+
+    id_vector_type sharedq_list = boost::move(async_sharedq_res.move());
+
+    std::vector<hpx::future<void> > init_sharedqs;
+
+    BOOST_FOREACH(hpx::id_type shared_q, sharedq_list)
+    {
+        init_sharedqs.push_back(
+            hpx::async<typename hpx::components::shared_queue>(
+                sharedq_id, p, sharedq_id)
+        );
+    }
+
+    hpx::wait(init_sharedqs);
+
+    //id_vector_type::iterator sharedq_itrb = sharedq_list.begin();
+
     BOOST_FOREACH(hpx::id_type id, hpx::util::locality_results(res))
     {
         init_futures.push_back(
-            hpx::async<typename StealStack::init_action>(id, p, i, num_stealstacks, id)
+            hpx::async<typename StealStack::init_action>(id, p, i, num_stealstacks
+                , id, sharedq_list)
         );
         stealstacks.push_back(id);
         ++i;

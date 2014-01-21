@@ -394,9 +394,9 @@ namespace components
                 res.first = true;
             }
             
-            hpx::future<std::pair<bool, std::vector<stealstack_node> > > res_future 
+            hpx::unique_future<std::pair<bool, std::vector<stealstack_node> > > res_future 
                 = hpx::async<typename ::components::shared_queue::steal_work_action>(sharedq_id);
-            res = boost::move(res_future.move());
+            res = boost::move(res_future.get());
             return res;
         }
 
@@ -437,7 +437,7 @@ namespace components
                 }
                 else
                 {
-                        std::vector<hpx::lcos::future<bool> > cw_futures;
+                        std::vector<hpx::unique_future<bool> > cw_futures;
 
                         typedef ws_stealstack::work_present_action action_type;
 
@@ -447,10 +447,11 @@ namespace components
                                 cw_futures.push_back(hpx::async<action_type>(id));    
                         }
 
-                        hpx::wait(cw_futures);
+                        //hpx::wait(cw_futures);
 
-                        BOOST_FOREACH(hpx::lcos::future<bool> f, cw_futures)
-                        {
+                        bool result = false;
+                        BOOST_FOREACH(hpx::lcos::unique_future<bool> &f, cw_futures)
+                        {   
                             if(f.get() == true)
                                 terminate = false;
                         }
@@ -497,7 +498,7 @@ namespace components
         void tree_search()
         {
             std::vector<node> parents;
-            std::vector<hpx::future<void> > gen_children_futures;
+            std::vector<hpx::unique_future<void> > gen_children_futures;
             gen_children_futures.reserve(param.chunk_size);
             while(get_work(parents))
             {

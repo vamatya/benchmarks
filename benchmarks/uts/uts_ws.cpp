@@ -24,7 +24,8 @@ HPX_REGISTER_MINIMAL_COMPONENT_FACTORY(
 int hpx_main(boost::program_options::variables_map & vm)
 {
     std::vector<hpx::id_type> stealstacks =
-        create_stealstacks<components::ws_stealstack>(vm, "workstealing");
+        create_stealstacks<components::ws_stealstack, components::shared_queue>(
+            vm, "workstealing");
 
     hpx::util::high_resolution_timer t;
 

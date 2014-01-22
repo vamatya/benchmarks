@@ -404,8 +404,8 @@ namespace components
 
         bool work_present()
         {
-            mutex_type::scoped_lock lk(check_work_mtx);	//##################
-            if(local_work > 0)// || sharedq_work > 0)
+            //mutex_type::scoped_lock lk(check_work_mtx);	//##################
+            if(local_work.load(boost::memory_order::memory_order_relaxed) > 0)
                 return true;
             else 
                 return false;

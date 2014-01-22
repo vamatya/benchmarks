@@ -401,7 +401,7 @@ inline std::vector<hpx::id_type> create_stealstacks(
     BOOST_FOREACH(hpx::id_type sharedq_id, sharedq_list)
     {
         init_sharedqs.push_back(
-            hpx::async<SharedQ::init_action>(
+            hpx::async<typename SharedQ::init_action>(
                 sharedq_id, p, sharedq_id)
         );
     }

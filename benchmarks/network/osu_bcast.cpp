@@ -47,7 +47,7 @@ struct broadcast_component
         {
             hpx::util::high_resolution_timer t;
 
-            recv_buffer = bcast(ids, 0, buffer_type(&send_buffer[0], size, buffer_type::reference)).move();
+            recv_buffer = bcast(ids, 0, buffer_type(&send_buffer[0], size, buffer_type::reference)).get();
 
             double t_elapsed = t.elapsed();
             if(i >= skip)
@@ -88,7 +88,7 @@ void run_benchmark(params const & p)
     }
 
     {
-        std::vector<hpx::future<void> > init_futures;
+        std::vector<hpx::unique_future<void> > init_futures;
         init_futures.reserve(ids.size());
         BOOST_FOREACH(hpx::id_type const & id, ids)
         {
@@ -96,7 +96,7 @@ void run_benchmark(params const & p)
                 hpx::async<broadcast_component::init_action>(id, ids, p.max_msg_size, p.fan_out)
             );
         }
-        hpx::wait(init_futures);
+        hpx::wait_all(init_futures);
     }
 
     for(std::size_t size = 1; size <= p.max_msg_size; size *=2)
@@ -107,7 +107,7 @@ void run_benchmark(params const & p)
             iterations = ITERATIONS_LARGE;
         }
 
-        std::vector<hpx::future<double> > run_futures;
+        std::vector<hpx::unique_future<double> > run_futures;
         run_futures.reserve(ids.size());
         BOOST_FOREACH(hpx::id_type const & id, ids)
         {
@@ -118,7 +118,11 @@ void run_benchmark(params const & p)
 
 
         std::vector<double> times; times.reserve(ids.size());
-        hpx::wait(run_futures, times);
+        hpx::wait_all(run_futures);
+        BOOST_FOREACH(hpx::unique_future<double> & f, run_futures)
+        {
+            times.push_back(f.get());
+        }
 
         double avg_latency = std::accumulate(times.begin(), times.end(), 0.0) / ids.size();
 

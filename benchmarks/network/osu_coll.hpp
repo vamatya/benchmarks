@@ -91,7 +91,7 @@ distribute_component(std::vector<hpx::id_type> localities, hpx::components::comp
 
     std::size_t num_components = hpx::get_os_thread_count();
 
-    typedef hpx::future<std::vector<hpx::naming::gid_type> > future_type;
+    typedef hpx::unique_future<std::vector<hpx::naming::gid_type> > future_type;
 
     future_type f;
     {
@@ -100,7 +100,7 @@ distribute_component(std::vector<hpx::id_type> localities, hpx::components::comp
         f = p.get_future();
     }
 
-    std::vector<hpx::future<result_type> > components_futures;
+    std::vector<hpx::unique_future<result_type> > components_futures;
     components_futures.reserve(2);
 
     if(localities.size() > 1)
@@ -135,16 +135,15 @@ distribute_component(std::vector<hpx::id_type> localities, hpx::components::comp
     res.second.push_back(
         value_type(this_loc.get_gid(), type)
     );
-    res.second.back().gids_ = boost::move(f.move());
+    res.second.back().gids_ = f.get();
 
     while(!components_futures.empty())
     {
-        std::vector<hpx::future<result_type> > fv_ret
-            = hpx::wait_any(components_futures);
+        hpx::wait_any(components_futures);
 
         std::size_t ct = 0, pos = 0;
 
-        BOOST_FOREACH(hpx::future<result_type> f, fv_ret)
+        BOOST_FOREACH(hpx::unique_future<result_type> & f, components_futures)
         {
             if(f.is_ready())
             {
@@ -154,7 +153,7 @@ distribute_component(std::vector<hpx::id_type> localities, hpx::components::comp
             ++ct;
         }
 
-        result_type r = fv_ret.at(pos).get();
+        result_type r = components_futures.at(pos).get();
         res.second.insert(res.second.end(), r.second.begin(), r.second.end());
         res.first += r.first;
         components_futures.erase(components_futures.begin() + pos);
@@ -172,14 +171,14 @@ inline std::vector<hpx::id_type> create_components(params const & p)
     std::vector<hpx::id_type> localities = hpx::find_all_localities(type);
 
     hpx::id_type id = localities[0];
-    hpx::future<std::pair<std::size_t, std::vector<hpx::util::remote_locality_result> > >
+    hpx::unique_future<std::pair<std::size_t, std::vector<hpx::util::remote_locality_result> > >
         async_result = hpx::async<distribute_component_action>(
             id, boost::move(localities), type);
 
     std::vector<hpx::id_type> components;
 
     std::pair<std::size_t, std::vector<hpx::util::remote_locality_result> >
-        result(boost::move(async_result.move()));
+        result(async_result.get());
 
     std::size_t num_components = result.first;
     components.reserve(num_components);

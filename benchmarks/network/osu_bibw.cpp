@@ -35,10 +35,10 @@ void isend(hpx::util::serialize_buffer<char> const& receive_buffer) {}
 HPX_PLAIN_ACTION(isend);
 
 ///////////////////////////////////////////////////////////////////////////////
-std::vector<hpx::future<void> >
+std::vector<hpx::unique_future<void> >
 send_async(hpx::naming::id_type dest, std::size_t size, std::size_t window_size)
 {
-    std::vector<hpx::future<void> > lazy_results;
+    std::vector<hpx::unique_future<void> > lazy_results;
     lazy_results.reserve(window_size);
 
     isend_action send;
@@ -63,11 +63,11 @@ hpx::util::serialize_buffer<char> irecv(std::size_t size)
 HPX_PLAIN_ACTION(irecv);
 
 ///////////////////////////////////////////////////////////////////////////////
-std::vector<hpx::future<hpx::util::serialize_buffer<char> > >
+std::vector<hpx::unique_future<hpx::util::serialize_buffer<char> > >
 recv_async(hpx::naming::id_type dest, std::size_t size, std::size_t window_size)
 {
     typedef hpx::util::serialize_buffer<char> buffer_type;
-    std::vector<hpx::future<buffer_type> > lazy_results;
+    std::vector<hpx::unique_future<buffer_type> > lazy_results;
     lazy_results.reserve(window_size);
     irecv_action recv;
     for (std::size_t j = 0; j < window_size; ++j)
@@ -115,18 +115,18 @@ void run_benchmark(boost::program_options::variables_map & vm)
             if(i == skip) t.restart();
 
             typedef hpx::util::serialize_buffer<char> buffer_type;
-            hpx::future<std::vector<hpx::future<buffer_type> > >recv_futures
+            hpx::unique_future<std::vector<hpx::unique_future<buffer_type> > >recv_futures
                 = hpx::async(HPX_STD_BIND(&recv_async, there, size, window_size));
 
-            hpx::future<std::vector<hpx::future<void> > > send_futures
+            hpx::unique_future<std::vector<hpx::unique_future<void> > > send_futures
                 = hpx::async(HPX_STD_BIND(&send_async, there, size, window_size));
 
             /*
             std::vector<buffer_type> recv_results;
             recv_results.reserve(window_size);
             */
-            hpx::wait(recv_futures.get());//, recv_results);
-            hpx::wait(send_futures.get());
+            hpx::wait_all(recv_futures.get());//, recv_results);
+            hpx::wait_all(send_futures.get());
         }
 
         double bw = (size / 1e6 * loop * window_size * 2)/ t.elapsed();

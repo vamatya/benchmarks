@@ -38,7 +38,7 @@ endforeach()
 
 
 set(coll_benchmarks
-    osu_bcast
+    #osu_bcast
     #osu_scatter
     )
 

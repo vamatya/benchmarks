@@ -3,6 +3,8 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
+#include <hpx/util/bind_action.hpp>
+
 #define HPX_DEFINE_COMPONENT_BROADCAST(NAME, TYPE)                              \
     void BOOST_PP_CAT(NAME, _)(TYPE const & value)                              \
     {                                                                           \
@@ -49,9 +51,9 @@ namespace hpx { namespace lcos
         }
 
         template <typename A0>
-        hpx::future<A0> operator()(std::vector<hpx::id_type> const & ids, std::size_t src, A0 const & a0)
+        hpx::unique_future<A0> operator()(std::vector<hpx::id_type> const & ids, std::size_t src, A0 const & a0)
         {
-            hpx::wait(bcast_future);
+            hpx::wait_all(bcast_future);
             if(ids[src] == this_id)
             {
                 std::vector<hpx::id_type> bcast_ids;
@@ -70,7 +72,7 @@ namespace hpx { namespace lcos
                     bcast_future =
                         hpx::async<detail::broadcast_impl_action>(
                             locality
-                          , boost::move(bcast_ids)
+                          , std::move(bcast_ids)
                           , hpx::util::bind(act, hpx::util::placeholders::_1, a0)
                           , fan_out
                         );
@@ -93,7 +95,7 @@ namespace hpx { namespace lcos
 
         void set(hpx::util::any const & v)
         {
-            hpx::wait(ready_future);
+            hpx::wait_all(ready_future);
             {
                 mutex_type::scoped_lock lk(mtx);
                 recv_value = v;
@@ -110,9 +112,9 @@ namespace hpx { namespace lcos
 
         hpx::lcos::local::and_gate bcast_gate;
         hpx::lcos::local::promise<void> ready_promise;
-        hpx::future<void> ready_future;
+        hpx::unique_future<void> ready_future;
         hpx::util::any recv_value;
-        hpx::future<void> bcast_future;
+        hpx::unique_future<void> bcast_future;
     };
 
     namespace detail
@@ -120,7 +122,7 @@ namespace hpx { namespace lcos
         void broadcast_impl(std::vector<hpx::id_type> ids, hpx::util::function<void(hpx::id_type)> fun, std::size_t fan_out)
         {
             // Call some action for the fan_out first ids here ...
-            std::vector<hpx::future<void> > broadcast_futures;
+            std::vector<hpx::unique_future<void> > broadcast_futures;
             broadcast_futures.reserve((std::min)(ids.size(), fan_out));
             for(std::size_t i = 0; i < (std::min)(fan_out, ids.size()); ++i)
             {

@@ -48,8 +48,8 @@ HPX_PLAIN_ACTION(isend);
 ///////////////////////////////////////////////////////////////////////////////
 double ireceive(hpx::naming::id_type dest, std::size_t size, std::size_t window_size)
 {
-    int loop = LOOP_SMALL;
-    int skip = SKIP_SMALL;
+    std::size_t loop = LOOP_SMALL;
+    std::size_t skip = SKIP_SMALL;
 
     if (size > LARGE_MESSAGE_SIZE) {
         loop = LOOP_LARGE;
@@ -65,7 +65,7 @@ double ireceive(hpx::naming::id_type dest, std::size_t size, std::size_t window_
 
     hpx::util::high_resolution_timer t;
 
-    std::vector<hpx::future<void> > lazy_results;
+    std::vector<hpx::unique_future<void> > lazy_results;
     lazy_results.resize(window_size);
     isend_action send;
     for (std::size_t i = 0; i != loop + skip; ++i) {

@@ -343,7 +343,8 @@ inline std::vector<hpx::id_type> distribute_sharedq(
 
 HPX_PLAIN_ACTION(distribute_sharedq);
 
-template <typename StealStack, typename SharedQ>
+//template <typename StealStack, typename SharedQ>
+template <typename StealStack>
 inline std::vector<hpx::id_type> create_stealstacks(
     boost::program_options::variables_map & vm, const char * name)
 {
@@ -387,7 +388,7 @@ inline std::vector<hpx::id_type> create_stealstacks(
         res.push_back(rl);
     }
 
-    // Create one shared queue component per locality
+    /*// Create one shared queue component per locality
     hpx::components::component_type sharedq_type = 
         hpx::components::get_component_type<SharedQ>();
     hpx::unique_future<std::vector<hpx::id_type> > async_sharedq_res = 
@@ -410,31 +411,30 @@ inline std::vector<hpx::id_type> create_stealstacks(
 
     std::cout << "Shared Queue no: " << sharedq_list.size() << "\n";
     //id_vector_type::iterator sharedq_itrb = sharedq_list.begin();
-    std::vector<hpx::unique_future<void> > init_c_sharedq;
+    std::vector<hpx::unique_future<void> > init_c_sharedq;*/
     BOOST_FOREACH(hpx::id_type id, hpx::util::locality_results(res))
     {
-        hpx::id_type sharedq_id;
+        /*hpx::id_type sharedq_id;
         BOOST_FOREACH(hpx::id_type s_id, sharedq_list)
         {
             if(s_id.get_msb() == id.get_msb())
                 sharedq_id = s_id;
-        }        
+        }*/       
 
         init_futures.push_back(
-            hpx::async<typename StealStack::init_action>(id, p, i, num_stealstacks, id)
+            hpx::async<typename StealStack::init_action>(id, p, i, num_stealstacks, id));
                 //, id, sharedq_list)
-                //, sharedq_id)
-        );
+                //, sharedq_id));
 
-        init_c_sharedq.push_back( 
+        /*init_c_sharedq.push_back( 
             hpx::async<typename StealStack::init_sharedq_id_action>(
                 id, sharedq_id));
-
+                */
         stealstacks.push_back(id);
         ++i;
-    }    
+    }
     hpx::wait(init_futures);
-    hpx::wait(init_c_sharedq);
+    //hpx::wait(init_c_sharedq);
 
     std::vector<hpx::unique_future<void> > resolve_names_futures;
     resolve_names_futures.reserve(num_stealstacks);

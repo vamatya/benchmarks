@@ -11,25 +11,37 @@
 #include <benchmarks/uts/params.hpp>
 #include <hpx/include/async.hpp>
 #include <hpx/include/components.hpp>
+#include <hpx/lcos/local/condition_variable.hpp>
 
 #include <boost/ref.hpp>
 
 namespace components
 {
-    struct shared_queue
+    /*struct shared_queue
       : hpx::components::managed_component_base<shared_queue>
     {
         typedef hpx::lcos::local::spinlock mutex_type;
         typedef boost::atomic<std::size_t> atomic_type;
         
-        mutex_type sharedq_mtx;
+        mutex_type sharedq_mtx, steal_ready_mtx;
 
-        shared_queue(): shared_q_(NULL), sharedq_work_(0)
-        {}
+        //struct suspended_threads
+        //{
+        //    hpx::id_type id;
+        //    hpx::util::high_resolution_timer time_begin;
+        //    bool suspended;
+        //};
+
+        shared_queue(): shared_q_(NULL), sharedq_work_(0), steal_ready_(NULL)
+        {
+            //hpx::util::high_resolution_timer t;
+        }
 
         shared_queue(params p, hpx::naming::id_type id)
-            : param_(p), shared_q_(NULL), sharedq_work_(0), my_id_(id)
-        {}
+            : param_(p), shared_q_(NULL), sharedq_work_(0), my_id_(id), steal_ready_(NULL)
+        {
+            //hpx::util::high_resolution_timer t;
+        }
 
         void init(params p, hpx::naming::id_type id)
         {
@@ -38,6 +50,34 @@ namespace components
         }
 
         HPX_DEFINE_COMPONENT_ACTION(shared_queue, init);
+
+        hpx::id_type steal_work_get(hpx::id_type requestor)
+        {
+            if(steal_ready_.size() != NULL)
+            {
+                hpx::id_type ret_val = steal_ready_.front();
+                steal_ready_.pop_front();
+                return boost::move(ret_val);
+            }
+            else if(steal_ready_.size() == NULL && shared_q_.size() != NULL)
+            {
+                return my_id_;
+            }
+            else
+            {
+                return requestor;
+            }
+        }
+
+        HPX_DEFINE_COMPONENT_ACTION(shared_queue, steal_work_get);
+
+        void steal_work_put(hpx::id_type sender)
+        {
+            mutex_type::scoped_lock lk(steal_ready_mtx);
+            steal_ready_.push_front(sender);
+        }
+
+        HPX_DEFINE_COMPONENT_ACTION(shared_queue, steal_work_put);
 
         // Shared Queue work amount. 
         std::size_t sharedq_size()
@@ -127,10 +167,13 @@ namespace components
         atomic_type sharedq_work_;
 
         std::deque<stealstack_node> shared_q_;
+        std::deque<hpx::id_type> steal_ready_;
+        //std::list<suspended_threads> suspended_threads_;
+        std::vector<hpx::id_type> suspended_threads_;
         hpx::naming::id_type my_id_;
 
         params param_;
-    };
+    };*/
 
     struct ws_stealstack
       : hpx::components::managed_component_base<ws_stealstack>
@@ -254,12 +297,12 @@ namespace components
 
         HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, init);
 
-        void init_sharedq_id(hpx::id_type s_id)
+        /*void init_sharedq_id(hpx::id_type s_id)
         {
             sharedq_id = s_id;
         }
 
-        HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, init_sharedq_id);
+        HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, init_sharedq_id);*/
 
         void resolve_names(std::vector<hpx::id_type> const & idss)
         {
@@ -270,8 +313,8 @@ namespace components
 
         void put_work(node const & n)
         {
-            if(2 * param.chunk_size * param.chunk_size > local_work)//local_q_.size())
-            {
+            //if(2 * param.chunk_size * param.chunk_size > local_work)//local_q_.size())
+            //{
                 {
                     mutex_type::scoped_lock lk(localq_mtx);	//###############
                     /* If the stack is empty, push an empty stealstack_node. */
@@ -299,8 +342,8 @@ namespace components
                 ++local_work;
                 std::size_t local_work_tmp = local_work;
                 stat.max_stack_depth = (std::max)(local_work_tmp, stat.max_stack_depth);
-            }
-            else
+            //}
+            /*else
             {   
                 std::vector<stealstack_node> ss_shared_vec;
                 //std::size_t num_elem_shared = local_work/2;
@@ -347,7 +390,7 @@ namespace components
                 ++local_work;
                 std::size_t local_work_tmp = local_work;
                 stat.max_stack_depth = (std::max)(local_work_tmp, stat.max_stack_depth);
-            }
+            }*/
         }
 
         void gen_children(node & parent)
@@ -381,9 +424,9 @@ namespace components
             }
         }
 
-        std::pair<bool, std::vector<stealstack_node> > steal_work(hpx::id_type requestor_id)
+        std::pair<bool, std::vector<stealstack_node> > steal_work()//hpx::id_type requestor_id)
         {
-            std::size_t work_stolen = 0;
+            /*std::size_t work_stolen = 0;
 
             std::pair<bool, std::vector<stealstack_node> > res = 
                 std::make_pair(false, std::vector<stealstack_node>());
@@ -396,7 +439,36 @@ namespace components
             hpx::unique_future<std::pair<bool, std::vector<stealstack_node> > > res_future 
                 = hpx::async<typename ::components::shared_queue::steal_work_action>(sharedq_id);
             res = boost::move(res_future.get());
+            return res;*/
+            std::pair<bool, std::vector<stealstack_node> > res =
+                std::make_pair(false, std::vector<stealstack_node>());
+
+            if(local_work > param.chunk_size * param.chunk_size)
+            {
+                mutex_type::scoped_lock lk(localq_mtx);
+                std::size_t steal_num = local_q_.size()/2;
+                res.second.resize(steal_num);
+                for(std::size_t i = 0; i < steal_num; ++i)
+                {
+                    std::swap(res.second[i], local_q_.back());
+                    local_q_.pop_back();
+
+                    if(local_work < res.second[i].work.size())
+                    {
+                        throw std::logic_error(
+                            "ensure_local_work(): local_work count is less than 0!");
+                    }
+                    local_work -= res.second[i].work.size();
+                }
+            }
+
+            if(local_work > 0 || work_shared > 0)
+            {
+                res.first = true;
+            }
+
             return res;
+
         }
 
         HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, steal_work);
@@ -416,9 +488,39 @@ namespace components
         {   
             while(local_work == 0)
             { 
-                bool terminate = true;
-                {   
-                    std::pair<bool, std::vector<stealstack_node> > node_pair(boost::move(steal_work(my_id)));
+                bool terminate = true; 
+                /*{   
+                    mutex_type::scoped_lock lk(check_work);
+
+                    //hpx::lcos::local::condition_variable<mutex_type::scoped_lock, bool>
+                    //    (lk, boost::move((hpx::async<check_work_action>(sharedq_id))
+                    //{}
+                    hpx::id_type steal_from = hpx::async(sharedq_id, my_id);
+                    if(steal_from != my_id)
+                    {
+                        // TO DO: Continuation Style task deployment
+                        if(steal_from != sharedq_id)
+                        {
+                            typedef components::ws_stealstack::steal_work_action action_type;
+                            std::pair<bool, std::vector<stealstack_node> > 
+                                node_pair(boost::move(hpx::async<action_type>(
+                                    steal_from)));
+                        }
+                        else
+                        {
+                            typedef components::shared_queue::steal_work_action action_type;
+                            std::pair<bool, std::vector<stealstack_node> >
+                                node_pair(boost::move(hpx::async<action_type>(
+                                    steal_from)));
+                        }
+                    }
+                    else
+                    {
+
+                        hpx::lcos::local::condition_variable::wait<lock_type, bool>(lk, true);
+                    }
+
+                    //std::pair<bool, std::vector<stealstack_node> > node_pair(boost::move(steal_work(my_id)));
 
                     mutex_type::scoped_lock lk(localq_mtx);
                     BOOST_FOREACH(stealstack_node ss_node, node_pair.second)
@@ -456,7 +558,38 @@ namespace components
                         }
                         if(terminate)
                             return false;
+                }*/
+
+                for(std::size_t i = 0; i < size -1; ++i)
+                {
+                    last_steal = (last_steal + 1) % size;
+                    if(last_steal == rank) last_steal = (last_steal + 1) % size;
+
+                    ws_stealstack::steal_work_action act;
+                    std::pair<bool, std::vector<stealstack_node> > node_pair(boost::move(act(ids[last_steal])));
+
+                    bool break_ = false;
+                    BOOST_FOREACH(stealstack_node & ss_node, node_pair.second)
+                    {
+                        if(ss_node.work.size() > 0)
+                        {
+                            mutex_type::scoped_lock lk(localq_mtx);
+                            terminate = false;
+
+                            local_q_.push_back(ss_node);
+                            local_work += ss_node.work.size();
+                            break_ = true;
+                        }
+                    }
+                    if(break_ || local_work > 0) break;
+
+                    if(node_pair.first)
+                    {
+                        terminate = false;
+                    }
                 }
+
+                if(terminate) return false;
             }
 
             return true;
@@ -529,7 +662,7 @@ namespace components
         boost::atomic<std::size_t> work_shared;
         boost::atomic<std::size_t> sharedq_work;
         hpx::id_type my_id;
-        hpx::id_type sharedq_id;
+        //hpx::id_type sharedq_id;
 
         stats stat;
 

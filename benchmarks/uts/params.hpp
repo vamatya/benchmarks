@@ -363,7 +363,7 @@ inline std::vector<hpx::id_type> create_stealstacks(
         stealstacks.push_back(id);
         ++i;
     }
-    hpx::wait(init_futures);
+    hpx::wait_all(init_futures);
 
     std::vector<hpx::unique_future<void> > resolve_names_futures;
     resolve_names_futures.reserve(num_stealstacks);
@@ -374,7 +374,7 @@ inline std::vector<hpx::id_type> create_stealstacks(
         );
     }
 
-    hpx::wait(resolve_names_futures);
+    hpx::wait_all(resolve_names_futures);
 
     return stealstacks;
 }

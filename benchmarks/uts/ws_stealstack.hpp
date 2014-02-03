@@ -17,164 +17,6 @@
 
 namespace components
 {
-    /*struct shared_queue
-      : hpx::components::managed_component_base<shared_queue>
-    {
-        typedef hpx::lcos::local::spinlock mutex_type;
-        typedef boost::atomic<std::size_t> atomic_type;
-        
-        mutex_type sharedq_mtx, steal_ready_mtx;
-
-        //struct suspended_threads
-        //{
-        //    hpx::id_type id;
-        //    hpx::util::high_resolution_timer time_begin;
-        //    bool suspended;
-        //};
-
-        shared_queue(): shared_q_(NULL), sharedq_work_(0), steal_ready_(NULL)
-        {
-            //hpx::util::high_resolution_timer t;
-        }
-
-        shared_queue(params p, hpx::naming::id_type id)
-            : param_(p), shared_q_(NULL), sharedq_work_(0), my_id_(id), steal_ready_(NULL)
-        {
-            //hpx::util::high_resolution_timer t;
-        }
-
-        void init(params p, hpx::naming::id_type id)
-        {
-            param_ = p;
-            my_id_ = id;
-        }
-
-        HPX_DEFINE_COMPONENT_ACTION(shared_queue, init);
-
-        hpx::id_type steal_work_get(hpx::id_type requestor)
-        {
-            if(steal_ready_.size() != NULL)
-            {
-                hpx::id_type ret_val = steal_ready_.front();
-                steal_ready_.pop_front();
-                return boost::move(ret_val);
-            }
-            else if(steal_ready_.size() == NULL && shared_q_.size() != NULL)
-            {
-                return my_id_;
-            }
-            else
-            {
-                return requestor;
-            }
-        }
-
-        HPX_DEFINE_COMPONENT_ACTION(shared_queue, steal_work_get);
-
-        void steal_work_put(hpx::id_type sender)
-        {
-            mutex_type::scoped_lock lk(steal_ready_mtx);
-            steal_ready_.push_front(sender);
-        }
-
-        HPX_DEFINE_COMPONENT_ACTION(shared_queue, steal_work_put);
-
-        // Shared Queue work amount. 
-        std::size_t sharedq_size()
-        {
-            return sharedq_work_.load();
-        }
-
-        HPX_DEFINE_COMPONENT_ACTION(shared_queue, sharedq_size);
-
-        std::pair<bool, std::vector<stealstack_node> > steal_work()
-        {
-            bool work_stolen = false;
-            std::size_t num_stealstacks = 0;
-            std::pair<bool, std::vector<stealstack_node> > ss_result =
-                std::make_pair(false, std::vector<stealstack_node>());
-
-            mutex_type::scoped_lock lk(sharedq_mtx);
-            if(sharedq_work_ > 0)
-            {
-                if(sharedq_work_ < param_.chunk_size)
-                {
-                    throw std::logic_error(
-                        "Steal Stack Node for Shared Q has less than Chunk Size Count");
-                }
-                else
-                {
-                    if(sharedq_work_ > param_.chunk_size * param_.chunk_size)
-                    {
-                        work_stolen = true;
-                        num_stealstacks = param_.chunk_size;
-                        ss_result.second.resize(num_stealstacks);
-
-                        BOOST_ASSERT(shared_q_.size() != 0);
-                        for(std::size_t i = 0; i< num_stealstacks; ++i)
-                        {
-                            std::swap(ss_result.second[i], shared_q_.back());
-                            shared_q_.pop_back();
-                            sharedq_work_ -= param_.chunk_size;
-                        }
-                        ss_result.first = work_stolen;
-                    }
-                    else if(sharedq_work_ > param_.chunk_size)
-                    {
-                        work_stolen = true;
-                        num_stealstacks = shared_q_.size()/2;
-                        ss_result.second.resize(num_stealstacks);
-
-                        for(std::size_t i = 0; i < num_stealstacks; ++i)
-                        {
-                            std::swap(ss_result.second[i], shared_q_.back());
-                            shared_q_.pop_back();
-                            sharedq_work_ -= param_.chunk_size;
-                        }
-                        ss_result.first = work_stolen;
-                    }
-                    else
-                    {
-                        work_stolen = true;
-                        num_stealstacks = 1;
-                        ss_result.second.push_back(shared_q_.front());
-                        shared_q_.pop_front();
-                        sharedq_work_ -= param_.chunk_size;
-                        ss_result.first = work_stolen;
-                    }
-                }
-            }
-
-            return ss_result;
-        }
-
-        HPX_DEFINE_COMPONENT_ACTION(shared_queue, steal_work);
-
-        // put chunk size steal stack node(work nodes)
-        void put_work(std::vector<stealstack_node> ssn_v)
-        {
-            mutex_type::scoped_lock lk(sharedq_mtx);
-            BOOST_FOREACH(stealstack_node ssn, ssn_v)
-            {
-                sharedq_work_ += ssn.work.size();
-                shared_q_.push_front(ssn);
-            }
-        }
-
-        HPX_DEFINE_COMPONENT_ACTION(shared_queue, put_work);
-
-    private:
-        atomic_type sharedq_work_;
-
-        std::deque<stealstack_node> shared_q_;
-        std::deque<hpx::id_type> steal_ready_;
-        //std::list<suspended_threads> suspended_threads_;
-        std::vector<hpx::id_type> suspended_threads_;
-        hpx::naming::id_type my_id_;
-
-        params param_;
-    };*/
-
     struct ws_stealstack
       : hpx::components::managed_component_base<ws_stealstack>
     {
@@ -696,8 +538,7 @@ namespace components
                 if(!terminate || local_work > 0)
                     return true;                    
 
-                //std::cout << "local work and sharedq work" << local_work << ";" << sharedq_work << std::endl;
-                //BOOST_ASSERT(local_work == 0 && sharedq_work == 0);
+                BOOST_ASSERT(local_work == 0 && sharedq_work == 0);
 
                 /// No work in local shared queue, look for work in other shared queue
                 for(std::size_t i = 0; i < size -1; ++i)
@@ -820,9 +661,6 @@ namespace components
         }
 
         HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, get_stats);
-
-    /*public:        
-        std::deque<stealstack_node> shared_q_;*/
 
     private:
         std::vector<hpx::id_type> ids;

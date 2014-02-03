@@ -143,13 +143,6 @@ namespace components
 
         HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, init);
 
-        /*void init_sharedq_id(hpx::id_type s_id)
-        {
-            sharedq_id = s_id;
-        }
-
-        HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, init_sharedq_id);*/
-
         void resolve_names(std::vector<hpx::id_type> const & idss)
         {
             ids = idss;
@@ -159,27 +152,24 @@ namespace components
 
         void put_work_sharedq(std::vector<stealstack_node> work_shared)
         {
+            std::size_t count = 0;
             {
-                //std::size_t count = 0;
                 mutex_type::scoped_lock lk(sharedq_mtx);
                 BOOST_FOREACH(stealstack_node ss_n, work_shared)
                 {
                     shared_q_.push_front(ss_n);
-                    //count += ss_n.work.size();
-                    sharedq_work += ss_n.work.size();
+                    count += ss_n.work.size();
                 }
             }
+            sharedq_work += count;
         }
 
         HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, put_work_sharedq);
 
         void put_work(node const & n)
-        {
-            //if(2 * param.chunk_size * param.chunk_size > local_work)//local_q_.size())
-            //{
+        {   
             if(local_work < max_localq_size) //param.chunk_size * param.chunk_size
             {
-                //mutex_type::scoped_lock lk(localq_mtx);	//###############
                 {   
                     /* If the stack is empty, push an empty stealstack_node. */
                     if(local_q_.empty())
@@ -220,11 +210,12 @@ namespace components
                     local_q_.pop_back();
                     local_work -= ss_nshare[i].work.size();
                 }
-                typedef components::ws_stealstack::put_work_sharedq_action action_type;
                 
+                //typedef components::ws_stealstack::put_work_sharedq_action action_type;
                 //hpx::unique_future<void> fut = hpx::async<action_type>(my_id, ss_nshare);
-                action_type act;
-                act(my_id, ss_nshare);
+                //action_type act;
+                //act(my_id, ss_nshare);
+                put_work_sharedq(ss_nshare);
 
                 {
                     if(local_q_.front().work.size() == param.chunk_size)
@@ -244,58 +235,7 @@ namespace components
                 ++local_work;
                 std::size_t local_work_tmp = local_work;
                 stat.max_stack_depth = (std::max)(local_work_tmp, stat.max_stack_depth);
-
-                //fut.get();
             }
-            //}
-            /*else
-            {   
-                std::vector<stealstack_node> ss_shared_vec;
-                //std::size_t num_elem_shared = local_work/2;
-                std::size_t num_stealstack_nodes = local_work/(2 * param.chunk_size);
-                //std::size_t num_stealstack_nodes = local_q_.size()/2;
-                mutex_type::scoped_lock lk(localq_mtx);
-                {                  
-                    BOOST_ASSERT(num_stealstack_nodes <= local_q_.size());
-                    if(num_stealstack_nodes > 0)
-                    {                    
-                        std::size_t ss_size = ss_shared_vec.size();
-                        for(std::size_t i = 0; i < num_stealstack_nodes; ++i)
-                        {   
-                            ss_shared_vec.push_back(local_q_.back());
-                            local_work -= param.chunk_size;
-                            local_q_.pop_back();
-                        }
-                        hpx::async<typename ::components::shared_queue::put_work_action>
-                            (sharedq_id, ss_shared_vec);
-                    }
-                    else
-                    {
-                        throw std::logic_error("Steal Stack nodes shared is zero!!");
-                    }
-
-                    BOOST_ASSERT(!local_q_.empty());
-
-                    {   
-                        if(local_q_.front().work.size() == param.chunk_size)
-                        {
-                            stealstack_node ss_node(param.chunk_size);
-                            local_q_.push_front(ss_node);
-                        }
-                        else if (local_q_.front().work.size() > param.chunk_size)
-                        {
-                            throw std::logic_error("ss_put_work(): Block has overflowed!");
-                        }
-
-                        stealstack_node & ss_node = local_q_.front();
-
-                        ss_node.work.push_back(n);
-                    }
-                }
-                ++local_work;
-                std::size_t local_work_tmp = local_work;
-                stat.max_stack_depth = (std::max)(local_work_tmp, stat.max_stack_depth);
-            }*/
         }
 
         void gen_children(node & parent)
@@ -336,25 +276,23 @@ namespace components
                 std::make_pair(false, std::vector<stealstack_node>());
 
             ///\a max_localq_size = param.chunk_size * param.chunk_size
-            if(sharedq_work > max_localq_size)
+            if(sharedq_work > max_localq_size/2)
             {    
-                mutex_type::scoped_lock lk(sharedq_mtx);
-                std::size_t steal_num = param.chunk_size;
+                std::size_t steal_num = param.chunk_size/2; // steal half from the local shared_q
                 res.second.resize(steal_num);
+                mutex_type::scoped_lock lk(sharedq_mtx);
+                for(std::size_t i = 0; i < steal_num; ++i)
                 {
-                    for(std::size_t i = 0; i < steal_num; ++i)
-                    {
-                        std::swap(res.second[i], shared_q_.back());
-                        shared_q_.pop_back();
-                        sharedq_work -= res.second[i].work.size();
-                    }
+                    std::swap(res.second[i], shared_q_.back());
+                    shared_q_.pop_back();
+                    sharedq_work -= res.second[i].work.size();
                 }
             }
-            else if(sharedq_work <= max_localq_size && sharedq_work > 0)
+            else if(sharedq_work > 0)
             {
-                mutex_type::scoped_lock lk(sharedq_mtx);
                 std::size_t steal_num = shared_q_.size();
                 res.second.resize(steal_num);
+                mutex_type::scoped_lock lk(sharedq_mtx);
                 {   
                     for(std::size_t i = 0; i < steal_num; ++i)
                     {   std::swap(res.second[i], shared_q_.back());
@@ -373,53 +311,41 @@ namespace components
         }
 
         /// steal only chunk size
-        std::pair<bool, std::vector<stealstack_node> > steal_work()//hpx::id_type requestor_id)
-        //std::pair<bool, stealstack_node> steal_work()//hpx::id_type requestor_id)
+        std::pair<bool, std::vector<stealstack_node> > steal_work()
         {
-            /*std::size_t work_stolen = 0;
-
-            std::pair<bool, std::vector<stealstack_node> > res = 
-                std::make_pair(false, std::vector<stealstack_node>());
-
-            if(work_stolen > 0)
-            {
-                res.first = true;
-            }
-            
-            hpx::unique_future<std::pair<bool, std::vector<stealstack_node> > > res_future 
-                = hpx::async<typename ::components::shared_queue::steal_work_action>(sharedq_id);
-            res = boost::move(res_future.get());
-            return res;*/
-
             std::pair<bool, std::vector<stealstack_node> > res =
                 std::make_pair(false, std::vector<stealstack_node>());
 
             /// For within node work stealing, steal chunk size work only
-            //if(local_work > max_localq_size) //param.chunk_size * param.chunk_size
-            if(sharedq_work >= param.chunk_size && shared_q_.size() != 0)
+            //if(sharedq_work >= param.chunk_size && shared_q_.size() != 0)
+            if(sharedq_work > 0)    // && shared_q_.size() != 0)
             {
-                //mutex_type::scoped_lock lk(localq_mtx);
-                mutex_type::scoped_lock lk(sharedq_mtx);
-                //std::size_t steal_num = local_q_.size()/2;
-                //res.second.resize(steal_num);
-                res.second.resize(1);
-                //for(std::size_t i = 0; i < steal_num; ++i)
-                //{
-                    //std::swap(res.second[i], local_q_.back());
-                    std::swap(res.second[0], shared_q_.back());
-                    //local_q_.pop_back();
-                    shared_q_.pop_back();
+                std::size_t steal_num = 0;
+                if(shared_q_.size() == 1)
+                    steal_num = 1;
+                else
+                    steal_num = shared_q_.size()/2;
 
-                    //if(local_work < res.second[i].work.size())
-                    if(sharedq_work < res.second[0].work.size())
-                    {
-                        throw std::logic_error(
-                            //"ensure_local_work(): local_work count is less than 0!");
-                        "ensure_sharedq_work(): sharedq_work count is less than chunksize!");
+                res.second.resize(steal_num);
+                
+                {
+                    std::size_t count = 0;
+                    mutex_type::scoped_lock lk(sharedq_mtx);
+                    for(std::size_t i = 0; i < steal_num; ++i)
+                    {      
+                        std::swap(res.second[i], shared_q_.back());
+                        shared_q_.pop_back();
+                        count += res.second[i].work.size();
+                        //sharedq_work -= res.second[i].work.size();
                     }
-                    //local_work -= res.second[i].work.size();
-                    sharedq_work -= res.second[0].work.size();
-                //}
+                    sharedq_work -= count;
+                }
+
+                if(sharedq_work < res.second[0].work.size())
+                {
+                    throw std::logic_error(
+                    "ensure_sharedq_work(): sharedq_work count is less than chunksize!");
+                }
             }
 
             //if(local_work > 0 || work_shared > 0)
@@ -449,76 +375,6 @@ namespace components
         {   
             while(local_work == 0)
             {   
-                /*{   
-                    mutex_type::scoped_lock lk(check_work);
-
-                    //hpx::lcos::local::condition_variable<mutex_type::scoped_lock, bool>
-                    //    (lk, boost::move((hpx::async<check_work_action>(sharedq_id))
-                    //{}
-                    hpx::id_type steal_from = hpx::async(sharedq_id, my_id);
-                    if(steal_from != my_id)
-                    {
-                        // TO DO: Continuation Style task deployment
-                        if(steal_from != sharedq_id)
-                        {
-                            typedef components::ws_stealstack::steal_work_action action_type;
-                            std::pair<bool, std::vector<stealstack_node> > 
-                                node_pair(boost::move(hpx::async<action_type>(
-                                    steal_from)));
-                        }
-                        else
-                        {
-                            typedef components::shared_queue::steal_work_action action_type;
-                            std::pair<bool, std::vector<stealstack_node> >
-                                node_pair(boost::move(hpx::async<action_type>(
-                                    steal_from)));
-                        }
-                    }
-                    else
-                    {
-
-                        hpx::lcos::local::condition_variable::wait<lock_type, bool>(lk, true);
-                    }
-
-                    //std::pair<bool, std::vector<stealstack_node> > node_pair(boost::move(steal_work(my_id)));
-
-                    mutex_type::scoped_lock lk(localq_mtx);
-                    BOOST_FOREACH(stealstack_node ss_node, node_pair.second)
-                    {
-                        if(ss_node.work.size() > 0)
-                        {
-                            local_q_.push_back(ss_node);
-                            local_work += ss_node.work.size();
-                        }
-                    }
-                }
-                if(local_work > 0) 
-                {
-                    break;                  
-                }
-                else
-                {
-                        std::vector<hpx::unique_future<bool> > cw_futures;
-
-                        typedef ws_stealstack::work_present_action action_type;
-
-                        BOOST_FOREACH(hpx::id_type id, ids)
-                        {
-                            if(id != my_id)
-                                cw_futures.push_back(hpx::async<action_type>(id));    
-                        }
-
-                        //hpx::wait(cw_futures);
-
-                        bool result = false;
-                        BOOST_FOREACH(hpx::lcos::unique_future<bool> &f, cw_futures)
-                        {   
-                            if(f.get() == true)
-                                terminate = false;
-                        }
-                        if(terminate)
-                            return false;
-                }*/
                 bool terminate = true; 
 
                 // steal work from own shared q first 
@@ -551,18 +407,48 @@ namespace components
                     std::pair<bool, std::vector<stealstack_node> > node_pair(boost::move(act(ids[last_steal])));
 
                     bool break_ = false;
-                    BOOST_FOREACH(stealstack_node & ss_node, node_pair.second)
+                    if(node_pair.second.size() != 0)
                     {
-                        if(ss_node.work.size() > 0)
+                        if(node_pair.second.size() > param.chunk_size/2)
                         {
-                            //mutex_type::scoped_lock lk(localq_mtx);
-                            terminate = false;
+                            std::size_t lcl_num = param.chunk_size/2;
+                            //local_q_.resize(lcl_num);
+                            // put a certain no. on local_q
+                            for(std::size_t i = 0; i < lcl_num; ++i)
+                            {
+                                local_q_.push_front(node_pair.second.back());
+                                node_pair.second.pop_back();
+                                local_work += local_q_.front().work.size();
+                            }
 
-                            local_q_.push_back(ss_node);
-                            local_work += ss_node.work.size();
+                            terminate = false;
                             break_ = true;
+                            //put remaining on shared_q
+                            {
+                                //std::size_t count = 0;
+                                mutex_type::scoped_lock lk(sharedq_mtx);
+                                BOOST_FOREACH(stealstack_node& ss_n, node_pair.second)
+                                {
+                                    shared_q_.push_front(ss_n);
+                                    sharedq_work += shared_q_.front().work.size();
+                                }
+                            }
+                            node_pair.second.clear();
+                        }
+                        else
+                        {
+                            BOOST_FOREACH(stealstack_node & ss_n, node_pair.second)
+                            {
+                                local_q_.push_front(ss_n);
+                                local_work += local_q_.front().work.size();
+                            }
+                            terminate = false;
+                            break_ = true;
+
+                            node_pair.second.clear();
                         }
                     }
+                    
                     if(break_ || local_work > 0) 
                     {
                         last_steal = last_steal_temp;
@@ -606,7 +492,7 @@ namespace components
                 return false;
             }
             {
-                mutex_type::scoped_lock lk(localq_mtx); //##################
+                //mutex_type::scoped_lock lk(localq_mtx); //##################
                 std::swap(work, local_q_.front().work);
                 local_q_.pop_front();
             }
@@ -664,7 +550,8 @@ namespace components
 
     private:
         std::vector<hpx::id_type> ids;
-        boost::atomic<std::size_t> local_work;
+        //boost::atomic<std::size_t> local_work;
+        std::size_t local_work;
         boost::atomic<std::size_t> work_shared;
         boost::atomic<std::size_t> sharedq_work;
         hpx::id_type my_id;

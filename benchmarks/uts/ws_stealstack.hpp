@@ -172,6 +172,7 @@ namespace components
             {
                 {   
                     /* If the stack is empty, push an empty stealstack_node. */
+                    mutex_type::scoped_lock lk(localq_mtx);
                     if(local_q_.empty())
                     {
                         stealstack_node ss_node(param.chunk_size);
@@ -218,6 +219,7 @@ namespace components
                 put_work_sharedq(ss_nshare);
 
                 {
+                    mutex_type::scoped_lock lk(localq_mtx);
                     if(local_q_.front().work.size() == param.chunk_size)
                     {
                         stealstack_node ss_node(param.chunk_size);
@@ -520,22 +522,22 @@ namespace components
         void tree_search()
         {
             std::vector<node> parents;
-            //std::vector<hpx::unique_future<void> > gen_children_futures;
-            //gen_children_futures.reserve(param.chunk_size);
+            std::vector<hpx::unique_future<void> > gen_children_futures;
+            gen_children_futures.reserve(param.chunk_size);
             while(get_work(parents))
             {
                 BOOST_FOREACH(node & parent, parents)
                 {
-                    /*gen_children_futures.push_back(
+                    gen_children_futures.push_back(
                         hpx::async(&ws_stealstack::gen_children, this
                             , boost::ref(parent))
-                    );*/
+                    );
                     // Test the serial version.
-                    gen_children(boost::ref(parent));
+                    //gen_children(boost::ref(parent));
                 }
                 parents.clear();
-                //hpx::wait(gen_children_futures);
-                //gen_children_futures.clear();
+                hpx::wait_all(gen_children_futures);
+                gen_children_futures.clear();
             }
         }
 
@@ -550,8 +552,8 @@ namespace components
 
     private:
         std::vector<hpx::id_type> ids;
-        //boost::atomic<std::size_t> local_work;
-        std::size_t local_work;
+        boost::atomic<std::size_t> local_work;
+        //std::size_t local_work;
         boost::atomic<std::size_t> work_shared;
         boost::atomic<std::size_t> sharedq_work;
         hpx::id_type my_id;

@@ -363,12 +363,12 @@ inline std::vector<hpx::id_type> create_stealstacks(
         stealstacks.push_back(id);
         ++i;
     }
-    //hpx::wait_all(init_futures);
-    hpx::when_all(init_futures).wait();
-    BOOST_FOREACH(hpx::unique_future<void>& init_fut, init_futures)
+    hpx::wait_all(init_futures);
+    //hpx::when_all(init_futures).wait();
+    /*BOOST_FOREACH(hpx::unique_future<void>& init_fut, init_futures)
     {
         init_fut.get();
-    }
+    }*/
 
     std::vector<hpx::unique_future<void> > resolve_names_futures;
     resolve_names_futures.reserve(num_stealstacks);
@@ -379,12 +379,12 @@ inline std::vector<hpx::id_type> create_stealstacks(
         );
     }
 
-    //hpx::wait_all(resolve_names_futures);
-    hpx::when_all(resolve_names_futures).wait();
-    BOOST_FOREACH(hpx::unique_future<void>& rslv_fut, resolve_names_futures)
+    hpx::wait_all(resolve_names_futures);
+    //hpx::when_all(resolve_names_futures).wait();
+    /*BOOST_FOREACH(hpx::unique_future<void>& rslv_fut, resolve_names_futures)
     {
         rslv_fut.get();
-    }
+    }*/
 
     return stealstacks;
 }

@@ -539,12 +539,12 @@ namespace components
                     );
                 }
                 parents.clear();
-                //hpx::wait_all(gen_children_futures);
-                hpx::when_all(gen_children_futures).wait();
-                BOOST_FOREACH(hpx::unique_future<void>& fut_ch, gen_children_futures)
+                hpx::wait_all(gen_children_futures);
+                //hpx::when_all(gen_children_futures).wait();
+                /*BOOST_FOREACH(hpx::unique_future<void>& fut_ch, gen_children_futures)
                 {
                     fut_ch.get();
-                }
+                }*/
                 gen_children_futures.clear();
             }
         }

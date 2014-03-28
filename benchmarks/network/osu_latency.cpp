@@ -66,7 +66,7 @@ double receive(
     hpx::util::high_resolution_timer t;
 
     std::vector<hpx::unique_future<buffer_type> > recv_buffers;
-    recv_buffers.resize(window_size);
+    recv_buffers.reserve(window_size);
 
     message_action msg;
     for (int i = 0; i != loop + skip; ++i) {
@@ -76,10 +76,11 @@ double receive(
 
         for(std::size_t j = 0; j < window_size; ++j)
         {
-            recv_buffers[j] = hpx::async(msg, dest, buffer_type(send_buffer, size,
-                buffer_type::reference));
+            recv_buffers.push_back(hpx::async(msg, dest, buffer_type(send_buffer, size,
+                buffer_type::reference)));
         }
         hpx::wait_all(recv_buffers);
+        recv_buffers.clear();
     }
 
     double elapsed = t.elapsed();

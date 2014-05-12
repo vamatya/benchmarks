@@ -87,7 +87,7 @@ struct params
         char strBuf[1024];
         rng_showtype(strBuf, 0);
 
-        hpx::unique_future<boost::uint32_t> locs = hpx::get_num_localities();
+        hpx::future<boost::uint32_t> locs = hpx::get_num_localities();
         hpx::cout
             << "Random number generator: " << strBuf << "\n"
             << "Compute granularity: " << compute_granularity << "\n"
@@ -238,7 +238,7 @@ distribute_stealstacks(std::vector<hpx::id_type> localities, float overcommit_fa
     std::size_t num_stealstacks =
         static_cast<std::size_t>(worker_threads * overcommit_factor);
 
-    typedef hpx::unique_future<std::vector<hpx::naming::gid_type> > future_type;
+    typedef hpx::future<std::vector<hpx::naming::gid_type> > future_type;
 
     future_type f;
     {
@@ -247,7 +247,7 @@ distribute_stealstacks(std::vector<hpx::id_type> localities, float overcommit_fa
         f = p.get_future();
     }
 
-    std::vector<hpx::unique_future<result_type> > stealstacks_futures;
+    std::vector<hpx::future<result_type> > stealstacks_futures;
     stealstacks_futures.reserve(2);
 
     if(localities.size() > 1)
@@ -291,7 +291,7 @@ distribute_stealstacks(std::vector<hpx::id_type> localities, float overcommit_fa
         std::size_t ct = 0;
         std::vector<std::size_t> pos;
 
-        BOOST_FOREACH(hpx::lcos::unique_future<result_type> &f, stealstacks_futures)
+        BOOST_FOREACH(hpx::lcos::future<result_type> &f, stealstacks_futures)
         {
             if(f.is_ready())
             {
@@ -329,7 +329,7 @@ inline std::vector<hpx::id_type> create_stealstacks(
     using hpx::components::distributing_factory;
 
     hpx::id_type id = localities[0];
-    hpx::unique_future<std::pair<std::size_t, std::vector<hpx::util::remote_locality_result> > >
+    hpx::future<std::pair<std::size_t, std::vector<hpx::util::remote_locality_result> > >
         async_result = hpx::async<distribute_stealstacks_action>(
             //id, boost::move(localities), overcommit_factor, type);
             id, localities, overcommit_factor, type);
@@ -339,7 +339,7 @@ inline std::vector<hpx::id_type> create_stealstacks(
 
     id_vector_type stealstacks;
 
-    std::vector<hpx::unique_future<void> > init_futures;
+    std::vector<hpx::future<void> > init_futures;
 
     std::size_t i = 0;
     std::pair<std::size_t, std::vector<hpx::util::remote_locality_result> >
@@ -365,12 +365,12 @@ inline std::vector<hpx::id_type> create_stealstacks(
     }
     hpx::wait_all(init_futures);
     //hpx::when_all(init_futures).wait();
-    /*BOOST_FOREACH(hpx::unique_future<void>& init_fut, init_futures)
+    /*BOOST_FOREACH(hpx::future<void>& init_fut, init_futures)
     {
         init_fut.get();
     }*/
 
-    std::vector<hpx::unique_future<void> > resolve_names_futures;
+    std::vector<hpx::future<void> > resolve_names_futures;
     resolve_names_futures.reserve(num_stealstacks);
     BOOST_FOREACH(hpx::id_type const & id, stealstacks)
     {
@@ -381,7 +381,7 @@ inline std::vector<hpx::id_type> create_stealstacks(
 
     hpx::wait_all(resolve_names_futures);
     //hpx::when_all(resolve_names_futures).wait();
-    /*BOOST_FOREACH(hpx::unique_future<void>& rslv_fut, resolve_names_futures)
+    /*BOOST_FOREACH(hpx::future<void>& rslv_fut, resolve_names_futures)
     {
         rslv_fut.get();
     }*/

@@ -464,7 +464,7 @@ namespace components
                 //Check if there is any work remaining throughout, if stealing unsuccessful. 
                 if(terminate && local_work < 1)
                 {
-                    std::vector<hpx::unique_future<bool> > check_work_futures;
+                    std::vector<hpx::future<bool> > check_work_futures;
                     typedef components::ws_stealstack::check_work_action action_type;
 
                     BOOST_FOREACH(hpx::id_type id, ids)
@@ -475,7 +475,7 @@ namespace components
                         }
                     }
                                 
-                    BOOST_FOREACH(hpx::unique_future<bool> & fut, check_work_futures)
+                    BOOST_FOREACH(hpx::future<bool> & fut, check_work_futures)
                     {
                         if(fut.get())
                         {
@@ -527,7 +527,7 @@ namespace components
         void tree_search()
         {
             std::vector<node> parents;
-            std::vector<hpx::unique_future<void> > gen_children_futures;
+            std::vector<hpx::future<void> > gen_children_futures;
             gen_children_futures.reserve(param.chunk_size);
             while(get_work(parents))
             {
@@ -541,7 +541,7 @@ namespace components
                 parents.clear();
                 hpx::wait_all(gen_children_futures);
                 //hpx::when_all(gen_children_futures).wait();
-                /*BOOST_FOREACH(hpx::unique_future<void>& fut_ch, gen_children_futures)
+                /*BOOST_FOREACH(hpx::future<void>& fut_ch, gen_children_futures)
                 {
                     fut_ch.get();
                 }*/

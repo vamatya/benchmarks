@@ -25,7 +25,7 @@ int hpx_main(boost::program_options::variables_map & vm)
 
     hpx::util::high_resolution_timer t;
 
-    std::vector<hpx::unique_future<void> > tree_search_futures;
+    std::vector<hpx::future<void> > tree_search_futures;
     tree_search_futures.reserve(stealstacks.size());
     BOOST_FOREACH(hpx::id_type const & id, stealstacks)
     {
@@ -40,7 +40,7 @@ int hpx_main(boost::program_options::variables_map & vm)
     
     double elapsed = t.elapsed();
 
-    std::vector<hpx::unique_future<components::ws_stealstack::stats> > stats_futures;
+    std::vector<hpx::future<components::ws_stealstack::stats> > stats_futures;
     stats_futures.reserve(stealstacks.size());
     BOOST_FOREACH(hpx::id_type const & id, stealstacks)
     {
@@ -55,7 +55,7 @@ int hpx_main(boost::program_options::variables_map & vm)
     stats.reserve(stealstacks.size());
     //hpx::wait(stats_futures, stats);
     hpx::wait_all(stats_futures);
-    BOOST_FOREACH(hpx::unique_future<components::ws_stealstack::stats>& stat_fut, stats_futures)
+    BOOST_FOREACH(hpx::future<components::ws_stealstack::stats>& stat_fut, stats_futures)
     {
         stats.push_back(stat_fut.get());
     }

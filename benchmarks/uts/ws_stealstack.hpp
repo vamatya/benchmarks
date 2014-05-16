@@ -13,15 +13,16 @@
 #include <hpx/include/components.hpp>
 #include <hpx/lcos/local/condition_variable.hpp>
 
+#include <exception>
 #include <boost/ref.hpp>
 
 namespace components
 {
 
-    //struct empty_queue: std::exception
-    //{
-    //    const char* what() const throw();
-    //};
+    struct empty_queue: std::exception
+    {
+        const char* what() const throw();
+    };
 
     template<typename T>
     class threadsafe_deque : boost::noncopyable

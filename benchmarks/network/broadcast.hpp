@@ -51,7 +51,7 @@ namespace hpx { namespace lcos
         }
 
         template <typename A0>
-        hpx::unique_future<A0> operator()(std::vector<hpx::id_type> const & ids, std::size_t src, A0 const & a0)
+        hpx::future<A0> operator()(std::vector<hpx::id_type> const & ids, std::size_t src, A0 const & a0)
         {
             hpx::wait_all(bcast_future);
             if(ids[src] == this_id)
@@ -112,9 +112,9 @@ namespace hpx { namespace lcos
 
         hpx::lcos::local::and_gate bcast_gate;
         hpx::lcos::local::promise<void> ready_promise;
-        hpx::unique_future<void> ready_future;
+        hpx::future<void> ready_future;
         hpx::util::any recv_value;
-        hpx::unique_future<void> bcast_future;
+        hpx::future<void> bcast_future;
     };
 
     namespace detail
@@ -122,7 +122,7 @@ namespace hpx { namespace lcos
         void broadcast_impl(std::vector<hpx::id_type> ids, hpx::util::function<void(hpx::id_type)> fun, std::size_t fan_out)
         {
             // Call some action for the fan_out first ids here ...
-            std::vector<hpx::unique_future<void> > broadcast_futures;
+            std::vector<hpx::future<void> > broadcast_futures;
             broadcast_futures.reserve((std::min)(ids.size(), fan_out));
             for(std::size_t i = 0; i < (std::min)(fan_out, ids.size()); ++i)
             {

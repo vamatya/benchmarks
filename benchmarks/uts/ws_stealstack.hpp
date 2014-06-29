@@ -114,6 +114,32 @@ namespace components
             
         }
 
+        void pop_back(std::vector<T>& nodes, std::size_t steal_num)
+        {
+            mutex_type::scoped_lock lk(mtx);
+            if(data.empty()) throw std::logic_error(
+                "Trying to pop from empty queue");
+            
+            std::size_t shared_q_size = data.size();
+
+            if(shared_q_size < steal_num)//nodes.size())
+            {
+                nodes.resize(shared_q_size);
+            }
+            else
+            {
+                nodes.resize(steal_num);
+            }
+            {
+                BOOST_FOREACH(T& nd, nodes)
+                {
+                    nd = data.back();
+                    data.pop_back();
+                }
+            }
+
+        }
+
         void pop_front(T& value)
         {
             mutex_type::scoped_lock lk(mtx);
@@ -361,15 +387,15 @@ namespace components
             if(sharedq_work > param.chunk_size)
             {
                 std::size_t steal_num = param.chunk_size;
-                res.second.resize(steal_num);
-                shared_q_.pop_back(res.second);
+                //res.second.resize(steal_num);
+                shared_q_.pop_back(res.second, steal_num);
                 sharedq_work -= res.second.size();//steal_num;
             }
             else if(sharedq_work > 0)
             {
                 std::size_t steal_num = sharedq_work;
-                res.second.resize(steal_num);
-                shared_q_.pop_back(res.second);
+                //res.second.resize(steal_num);
+                shared_q_.pop_back(res.second, steal_num);
                 sharedq_work -= res.second.size();//steal_num;
             }
 
@@ -386,7 +412,7 @@ namespace components
         bool check_work()
         {
             //mutex_type::scoped_lock lk(check_work_mtx);	//##################
-            if(sharedq_work > 0 || local_work > 0)
+            if(shared_q_.size() > 0 || local_q_.size() > 0)//sharedq_work > 0 || local_work > 0)
                 return true;
             else 
                 return false;
@@ -396,7 +422,7 @@ namespace components
 
         bool ensure_local_work()
         {   
-            while(local_work == 0)
+            while(local_q_.size() == 0)//local_work == 0)
             {   
                 bool terminate = true; 
 
@@ -408,20 +434,24 @@ namespace components
                 if(node_pair.first)
                 {   
                     //mutex_type::scoped_lock lk(localq_mtx);
-                    if(node_pair.second.size() != 0)
-                    {
-                        terminate = false;
-                    }
+                    //if(node_pair.second.size() != 0)
+                    //{
+                    BOOST_ASSERT(node_pair.second.size() != 0);
+                    terminate = false;
+                    //}
 
-                    local_q_.push_front(node_pair.second);
+                    // For depth first search, so push_back and pop_back are more appropriate
+                    // rather than push_front and pop_back, which is better for breadth first search.
+                    //local_q_.push_front(node_pair.second);
+                    local_q_.push_back(node_pair.second);
                     local_work += node_pair.second.size();
                 }
                 
 
                 /// check if local stealing was successful, else steal from others
-                if(terminate && local_work < 1)
+                if(terminate && local_q_.size() < 1)  //local_work < 1)
                 {
-                    BOOST_ASSERT(local_work == 0 && sharedq_work == 0);
+                    BOOST_ASSERT(local_q_.size() == 0 && shared_q_.size() == 0);//sharedq_work == 0);
 
                     /// No work in local shared queue, look for work in other shared queue
                     for(std::size_t i = 0; i < size -1; ++i)
@@ -437,22 +467,25 @@ namespace components
                         bool break_ = false;
                         if(node_pair.first)
                         {                                                       
-                            if(node_pair.second.size() != 0)
-                            {
-                                terminate = false;
-                                break_ = true;
-                            }
+                            //if(node_pair.second.size() != 0)
+                            //{
+                            BOOST_ASSERT(node_pair.second.size() != 0);
+                            terminate = false;
+                            break_ = true;
+                            /*}
                             else
                             {
                                 throw std::logic_error(
                                     "Stolen work did not received. Remote queue probably popped.");
-                            }
+                            }*/
 
-                            local_q_.push_front(node_pair.second);
+                            //Depth First Search
+                            //local_q_.push_front(node_pair.second);
+                            local_q_.push_back(node_pair.second);
                             local_work += node_pair.second.size();
                         }
                     
-                        if(break_ || local_work > 0) 
+                        if(break_ || local_q_.size() > 0) //local_work > 0) 
                         {
                             last_steal = last_steal_temp;
                             break;
@@ -463,7 +496,7 @@ namespace components
                 }
 
                 //Check if there is any work remaining throughout, if stealing unsuccessful. 
-                if(terminate && local_work < 1)
+                if(terminate && local_q_.size() < 1)//local_work < 1)
                 {
                     std::vector<hpx::future<bool> > check_work_futures;
                     typedef components::ws_stealstack::check_work_action action_type;
@@ -500,27 +533,32 @@ namespace components
                 return false;
             }
             
-            if(local_work > param.chunk_size)
+            /*if(local_q_.size() > param.chunk_size)//local_work > param.chunk_size)
             {
                 work.resize(param.chunk_size);
-                local_q_.pop_front(work);
+                //local_q_.pop_front(work);
+                local_q_.pop_back(work);
             }
             else if(local_work > 0)
             {
                 work.resize(local_work);
-                local_q_.pop_front(work);
-            }                                        
-            stat.n_nodes += work.size();
-            local_work -= work.size();
+                //local_q_.pop_front(work);
+                local_q_.pop_back(work);
+            }*/
+            local_q_.pop_back(work, param.chunk_size);
 
-            if(work.size() == 0)
+            std::size_t tmp_work_size = work.size();
+
+            if(tmp_work_size == 0)
             {
-                hpx::cout << "get_work(): called with work.size() = 0, "
+                hpx::cout << "TreeSearch: get_work(): called with work.size() = 0, "
                     << "local_work=" << local_work
                     << " or " << (local_work % param.chunk_size)
                     << " (mod " << param.chunk_size << ")\n" << hpx::flush;
                 throw std::logic_error("get_work(): Underflow!");
             }
+            stat.n_nodes += tmp_work_size;//work.size();
+            local_work -= tmp_work_size;//work.size();         
 
             return true;
         }
@@ -531,7 +569,7 @@ namespace components
             std::vector<hpx::future<void> > gen_children_futures;
             gen_children_futures.reserve(param.chunk_size);
             while(get_work(parents))
-            {
+            {   
                 BOOST_FOREACH(node & parent, parents)
                 {
                     gen_children_futures.push_back(
@@ -541,7 +579,6 @@ namespace components
                 }
                 parents.clear();
                 hpx::wait_all(gen_children_futures);
-                //hpx::when_all(gen_children_futures).wait();
                 /*BOOST_FOREACH(hpx::future<void>& fut_ch, gen_children_futures)
                 {
                     fut_ch.get();

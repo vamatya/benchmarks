@@ -310,7 +310,8 @@ namespace components
         void put_work_sharedq(std::vector<node>& work_shared)
         {
             std::size_t temp_size = work_shared.size();
-            shared_q_.push_front(work_shared);//, temp_size);
+            //shared_q_.push_front(work_shared);//, temp_size);
+            shared_q_.push_back(work_shared);
             sharedq_work += temp_size;
         }
 
@@ -318,9 +319,11 @@ namespace components
 
         void put_work(node const & n)
         {   
-            if(local_work < max_localq_size)
+            if(//local_work < max_localq_size)
+                local_q_.size() < max_localq_size)
             {   
-                local_q_.push_front(n);
+                //local_q_.push_front(n);
+                local_q_.push_back(n);
                 ++local_work;
                 std::size_t local_work_tmp = local_work;
                 stat.max_stack_depth = (std::max)(local_work_tmp, stat.max_stack_depth);
@@ -332,16 +335,18 @@ namespace components
                 std::size_t temp_count = 0;
                     
                 BOOST_ASSERT(!local_q_.empty());
-                std::size_t transfer_size = local_work/2; //local_q_.size()/2;
+                std::size_t transfer_size = local_q_.size()/2;
+                    //local_work/2; 
                 nshare.resize(transfer_size);
                 local_q_.pop_back(nshare);
 
                local_work -= nshare.size();//transfer_size;
                put_work_sharedq(nshare);
-                local_q_.push_front(n);
-                ++local_work;
-                std::size_t local_work_tmp = local_work;
-                stat.max_stack_depth = (std::max)(local_work_tmp, stat.max_stack_depth);
+                //local_q_.push_front(n);
+               local_q_.push_back(n);
+               ++local_work;
+               std::size_t local_work_tmp = local_work;
+               stat.max_stack_depth = (std::max)(local_work_tmp, stat.max_stack_depth);
             }
         }
 

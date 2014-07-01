@@ -325,8 +325,8 @@ namespace components
                 //local_q_.push_front(n);
                 local_q_.push_back(n);
                 ++local_work;
-                std::size_t local_work_tmp = local_work;
-                stat.max_stack_depth = (std::max)(local_work_tmp, stat.max_stack_depth);
+                std::size_t local_work_tmp = local_work;                
+                stat.max_stack_depth = (std::max)(local_work_tmp + sharedq_work, stat.max_stack_depth);
             }
             else
             {
@@ -346,7 +346,7 @@ namespace components
                local_q_.push_back(n);
                ++local_work;
                std::size_t local_work_tmp = local_work;
-               stat.max_stack_depth = (std::max)(local_work_tmp, stat.max_stack_depth);
+               stat.max_stack_depth = (std::max)(local_work_tmp + sharedq_work, stat.max_stack_depth);
             }
         }
 

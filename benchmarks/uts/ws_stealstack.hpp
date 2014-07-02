@@ -10,6 +10,9 @@
 #include <benchmarks/uts/params.hpp>
 #include <hpx/include/async.hpp>
 #include <hpx/include/components.hpp>
+#include <hpx/lcos/local/condition_variable.hpp>
+
+#include <boost/ref.hpp>
 
 namespace components
 {

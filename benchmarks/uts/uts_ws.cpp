@@ -35,7 +35,6 @@ int hpx_main(boost::program_options::variables_map & vm)
         );
     }
 
-    //hpx::wait(tree_search_futures);
     hpx::wait_all(tree_search_futures);
 
     double elapsed = t.elapsed();
@@ -53,8 +52,11 @@ int hpx_main(boost::program_options::variables_map & vm)
 
     std::vector<components::ws_stealstack::stats> stats;
     stats.reserve(stealstacks.size());
-    //hpx::wait(stats_futures, stats);
-    hpx::wait_all(stats_futures, stats);
+    hpx::wait_all(stats_futures);
+	BOOST_FOREACH(hpx::future<components::ws_stealstack::stats>& stat_fut, stats_futures)
+    {
+        stats.push_back(stat_fut.get());
+    }
     show_stats(elapsed, stats, vm["verbose"].as<int>(), vm["chunk-size"].as<std::size_t>(), vm["overcommit-factor"].as<float>());
 
     return hpx::finalize();

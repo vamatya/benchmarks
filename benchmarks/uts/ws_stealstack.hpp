@@ -308,14 +308,16 @@ namespace components
                 BOOST_FOREACH(node & parent, parents)
                 {
                     gen_children_futures.push_back(
-                        hpx::async(&ws_stealstack::gen_children, this, parent)
+                        hpx::async(&ws_stealstack::gen_children, this, 
+							boost::ref(parent))
                     );
                     /*
                     gen_children(parent);
                     */
                 }
                 parents.clear();
-                hpx::wait(gen_children_futures);
+                //hpx::wait(gen_children_futures);
+                hpx::wait_all(gen_children_futures);
                 gen_children_futures.clear();
             }
         }

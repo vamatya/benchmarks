@@ -7,6 +7,7 @@
 set(benchmarks
     uts_ws
 #    uts_wm
+    unit_task
    )
 
 add_definitions(-DBRG_RNG)

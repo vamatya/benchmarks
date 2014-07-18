@@ -17,6 +17,7 @@
 #include <cmath>
 
 #define MAX_NUM_CHILDREN    100  // cap on children (BIN root is exempt)
+#define MAX_SPAWN_GRANULARITY 500  // cap max sequential work
 
 // Interpret 32 bit positive integer as value on [0,1)
 inline double rng_toProb(int n) 

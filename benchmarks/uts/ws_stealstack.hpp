@@ -15,6 +15,9 @@
 
 #include <exception>
 #include <boost/ref.hpp>
+#include <boost/iterator/counting_iterator.hpp>
+#include <boost/range/counting_range.hpp>
+#include <boost/range/algorithm.hpp>
 
 namespace components
 {
@@ -189,6 +192,26 @@ namespace components
         }
     };
 
+    template<typename R, typename NODE, typename P, typename WS_SS>
+    struct spawn_work
+    {
+    public: 
+        typedef void result_type;
+
+        template <typename FN>
+        struct result;
+
+        template <typename FN, typename RN, typename ND, typename GR, typename SSN>
+        struct result<FN(RN, ND, GR, SSN)>
+        {
+            typedef void type;
+        };
+
+        //typename result<spawn_work(R,NODE,P, WS_SS)>::type
+        result_type
+            operator()(R const& range, NODE& parent, P& param_, WS_SS this_ss);
+    };
+
     struct ws_stealstack
       : hpx::components::managed_component_base<ws_stealstack>
     {
@@ -246,7 +269,7 @@ namespace components
             std::size_t max_tree_depth;
 
             double time[NSTATES];
-        };
+        };        
 
         ws_stealstack()
           : local_work(0)          
@@ -310,7 +333,6 @@ namespace components
         void put_work_sharedq(std::vector<node>& work_shared)
         {
             std::size_t temp_size = work_shared.size();
-            //shared_q_.push_front(work_shared);//, temp_size);
             shared_q_.push_back(work_shared);
             sharedq_work += temp_size;
         }
@@ -319,10 +341,8 @@ namespace components
 
         void put_work(node const & n)
         {   
-            if(//local_work < max_localq_size)
-                local_q_.size() < max_localq_size)
-            {   
-                //local_q_.push_front(n);
+            if(local_q_.size() < max_localq_size)
+            {  
                 local_q_.push_back(n);
                 ++local_work;
                 std::size_t local_work_tmp = local_work;                
@@ -336,13 +356,11 @@ namespace components
                     
                 BOOST_ASSERT(!local_q_.empty());
                 std::size_t transfer_size = local_q_.size()/2;
-                    //local_work/2; 
                 nshare.resize(transfer_size);
                 local_q_.pop_back(nshare);
 
                local_work -= nshare.size();//transfer_size;
                put_work_sharedq(nshare);
-                //local_q_.push_front(n);
                local_q_.push_back(n);
                ++local_work;
                std::size_t local_work_tmp = local_work;
@@ -363,16 +381,65 @@ namespace components
 
             if(num_children > 0)
             {
-                for(int i = 0; i < num_children; ++i)
+                if(num_children < MAX_SPAWN_GRANULARITY)
                 {
-                    node child;
-                    child.type = child_type;
-                    child.height = parent_height + 1;
-                    for(int j = 0; j < param.compute_granularity; ++j)
+                    for(int i = 0; i < num_children; ++i)
                     {
-                        rng_spawn(parent.state.state, child.state.state, i);
+                        node child;
+                        child.type = child_type;
+                        child.height = parent_height + 1;
+                        for(int j = 0; j < param.compute_granularity; ++j)
+                        {
+                            rng_spawn(parent.state.state, child.state.state, i);
+                        }
+                        put_work(child);
                     }
-                    put_work(child);
+                }
+                else
+                {
+                    typedef boost::iterator_range<boost::counting_iterator<std::size_t> >  count_itr_type;
+                    std::vector<count_itr_type> ranges;
+
+                    std::size_t chunk_commit = 0;
+                    std::size_t remainder = num_children;
+                    while(chunk_commit != num_children)
+                    {   
+                        if((num_children - chunk_commit) <  2 * MAX_SPAWN_GRANULARITY)
+                        {
+                            std::size_t temp_var = (num_children - chunk_commit)/2;
+                            ranges.push_back(boost::counting_range(chunk_commit, chunk_commit + temp_var));
+                            chunk_commit += temp_var;
+                            ranges.push_back(boost::counting_range(chunk_commit, (std::size_t)num_children));
+                            chunk_commit += num_children - chunk_commit;
+                        }
+                        else
+                        {
+                            ranges.push_back(boost::counting_range(chunk_commit, chunk_commit + MAX_SPAWN_GRANULARITY));
+                            chunk_commit += MAX_SPAWN_GRANULARITY;
+                        }
+                    }
+
+                    typedef node node_type;
+                    typedef components::ws_stealstack ws_stealstack_type;
+                    typedef params param_type;
+
+                    //spawn_work<count_itr_type, node_type, std::size_t, ss_node_type>  
+                    std::vector<hpx::future<void> > fun_obj_futures; 
+                    BOOST_FOREACH(count_itr_type rng, ranges)
+                    {
+                        spawn_work<count_itr_type, node_type, param_type, ws_stealstack_type*> sp_work;
+                        fun_obj_futures.push_back(
+                            hpx::async(
+                                HPX_STD_BIND(
+                                    sp_work
+                                    , rng
+                                    , boost::ref(parent)
+                                    , boost::ref(param)
+                                    , this
+                            )));
+                    }
+                    hpx::wait_all(fun_obj_futures);
+                    fun_obj_futures.clear();
                 }
             }
             else
@@ -417,7 +484,7 @@ namespace components
         bool check_work()
         {
             //mutex_type::scoped_lock lk(check_work_mtx);	//##################
-            if(shared_q_.size() > 0 || local_q_.size() > 0)//sharedq_work > 0 || local_work > 0)
+            if(shared_q_.size() > 0 || local_q_.size() > 0)
                 return true;
             else 
                 return false;
@@ -427,7 +494,7 @@ namespace components
 
         bool ensure_local_work()
         {   
-            while(local_q_.size() == 0)//local_work == 0)
+            while(local_q_.size() == 0)
             {   
                 bool terminate = true; 
 
@@ -438,16 +505,10 @@ namespace components
                 std::size_t temp_count = 0;
                 if(node_pair.first)
                 {   
-                    //mutex_type::scoped_lock lk(localq_mtx);
-                    //if(node_pair.second.size() != 0)
-                    //{
                     BOOST_ASSERT(node_pair.second.size() != 0);
                     terminate = false;
-                    //}
-
-                    // For depth first search, so push_back and pop_back are more appropriate
-                    // rather than push_front and pop_back, which is better for breadth first search.
-                    //local_q_.push_front(node_pair.second);
+                    
+                    // depth first search
                     local_q_.push_back(node_pair.second);
                     local_work += node_pair.second.size();
                 }
@@ -461,7 +522,6 @@ namespace components
                     /// No work in local shared queue, look for work in other shared queue
                     for(std::size_t i = 0; i < size -1; ++i)
                     {   
-                    
                         if(last_steal == rank) last_steal = (last_steal + 1) % size;
                     
                         std::size_t last_steal_temp = last_steal;
@@ -471,26 +531,17 @@ namespace components
 
                         bool break_ = false;
                         if(node_pair.first)
-                        {                                                       
-                            //if(node_pair.second.size() != 0)
-                            //{
+                        {                 
                             BOOST_ASSERT(node_pair.second.size() != 0);
                             terminate = false;
                             break_ = true;
-                            /*}
-                            else
-                            {
-                                throw std::logic_error(
-                                    "Stolen work did not received. Remote queue probably popped.");
-                            }*/
 
                             //Depth First Search
-                            //local_q_.push_front(node_pair.second);
                             local_q_.push_back(node_pair.second);
                             local_work += node_pair.second.size();
                         }
                     
-                        if(break_ || local_q_.size() > 0) //local_work > 0) 
+                        if(break_ || local_q_.size() > 0) 
                         {
                             last_steal = last_steal_temp;
                             break;
@@ -501,7 +552,7 @@ namespace components
                 }
 
                 //Check if there is any work remaining throughout, if stealing unsuccessful. 
-                if(terminate && local_q_.size() < 1)//local_work < 1)
+                if(terminate && local_q_.size() < 1)
                 {
                     std::vector<hpx::future<bool> > check_work_futures;
                     typedef components::ws_stealstack::check_work_action action_type;
@@ -521,7 +572,6 @@ namespace components
                             terminate =  false;
                             break;
                         }
-                        
                     }
                 }
 
@@ -537,19 +587,7 @@ namespace components
             {
                 return false;
             }
-            
-            /*if(local_q_.size() > param.chunk_size)//local_work > param.chunk_size)
-            {
-                work.resize(param.chunk_size);
-                //local_q_.pop_front(work);
-                local_q_.pop_back(work);
-            }
-            else if(local_work > 0)
-            {
-                work.resize(local_work);
-                //local_q_.pop_front(work);
-                local_q_.pop_back(work);
-            }*/
+
             local_q_.pop_back(work, param.chunk_size);
 
             std::size_t tmp_work_size = work.size();
@@ -562,8 +600,8 @@ namespace components
                     << " (mod " << param.chunk_size << ")\n" << hpx::flush;
                 throw std::logic_error("get_work(): Underflow!");
             }
-            stat.n_nodes += tmp_work_size;//work.size();
-            local_work -= tmp_work_size;//work.size();         
+            stat.n_nodes += tmp_work_size;
+            local_work -= tmp_work_size;         
 
             return true;
         }
@@ -571,24 +609,25 @@ namespace components
         void tree_search()
         {
             std::vector<node> parents;
-            std::vector<hpx::future<void> > gen_children_futures;
-            gen_children_futures.reserve(param.chunk_size);
+            //std::vector<hpx::future<void> > gen_children_futures;
+            //gen_children_futures.reserve(param.chunk_size);
             while(get_work(parents))
             {   
                 BOOST_FOREACH(node & parent, parents)
                 {
-                    gen_children_futures.push_back(
+                    /*gen_children_futures.push_back(
                         hpx::async(&ws_stealstack::gen_children, this
                             , boost::ref(parent))
-                    );
+                    );*/
+                    ws_stealstack::gen_children(boost::ref(parent));
                 }
                 parents.clear();
-                hpx::wait_all(gen_children_futures);
+                //hpx::wait_all(gen_children_futures);
                 /*BOOST_FOREACH(hpx::future<void>& fut_ch, gen_children_futures)
                 {
                     fut_ch.get();
                 }*/
-                gen_children_futures.clear();
+                //gen_children_futures.clear();
             }
         }
 
@@ -641,6 +680,26 @@ namespace components
         std::size_t rank;
         std::size_t size;
     };
+
+    template<typename R, typename NODE, typename P, typename WS_SS>
+    typename spawn_work<R, NODE, P, WS_SS>::result_type
+        spawn_work<R,NODE, P, WS_SS>::operator ()(R const& range, NODE& parent, P& param_, WS_SS this_ss)
+    {
+        int child_type = parent.child_type(param_);
+        std::size_t parent_height = parent.height;
+        BOOST_FOREACH(std::size_t i, range)
+        {
+            node child;
+            child.type= child_type;
+            child.height = parent_height + 1;
+
+            for(int j = 0; j < param_.compute_granularity; ++j)
+            {
+                rng_spawn(parent.state.state, child.state.state,(int)i);
+            }
+            this_ss->put_work(child);
+        }            
+    }
 }
 
 #endif

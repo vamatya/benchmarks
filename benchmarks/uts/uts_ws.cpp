@@ -59,7 +59,7 @@ int hpx_main(boost::program_options::variables_map & vm)
     {
         stats.push_back(stat_fut.get());
     }
-    show_stats(elapsed, stats, vm["verbose"].as<int>(), vm["chunk-size"].as<std::size_t>(), vm["overcommit-factor"].as<float>());
+    show_stats(elapsed, stats, vm["verbose"].as<int>(), vm["header"].as<int>(), vm["chunk-size"].as<std::size_t>(), vm["overcommit-factor"].as<float>());
 
     return hpx::finalize();
 }

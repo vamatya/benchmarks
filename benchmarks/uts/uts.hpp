@@ -342,7 +342,7 @@ struct stealstack_node
 };
 
 template <typename Stats>
-void show_stats(double walltime, Stats const & stats, int verbose, std::size_t chunk_size, float overcommit_factor)
+void show_stats(double walltime, Stats const & stats, int verbose, int header, std::size_t chunk_size, float overcommit_factor)
 {
     std::size_t tnodes = 0, tleaves = 0, trel = 0, tacq = 0, tsteal = 0, tfail= 0;
     std::size_t mdepth = 0, mheight = 0;
@@ -388,14 +388,21 @@ void show_stats(double walltime, Stats const & stats, int verbose, std::size_t c
 
     // summarize execution info for machine consumption
     if (verbose == 0) {
+        if (header == 1){
+            hpx::cout << "OS_Threads,Num_localities,Execution_Time,"
+                "Nodes_traversed,Chunk_size,Overcommit_factor\n"
+            << hpx::flush;
+        }
         std::size_t num_threads = hpx::get_num_worker_threads();
+        hpx::future<boost::uint32_t> locs = hpx::get_num_localities();
         hpx::cout
-            << num_threads << " "
-            << walltime << " "
-            << tnodes << " "
-            << static_cast<long long>(tnodes/walltime) << " "
-            << static_cast<long long>((tnodes/walltime)/num_threads) << " "
-            << chunk_size << " "
+            << num_threads << ","
+            << locs.get() << ","
+            << walltime << ","
+            << tnodes << ","
+            //<< static_cast<long long>(tnodes/walltime) << ","
+            //<< static_cast<long long>((tnodes/walltime)/num_threads) << ","
+            << chunk_size << ","
             << overcommit_factor << "\n"
             << hpx::flush;
         /*

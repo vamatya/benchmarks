@@ -35,6 +35,7 @@ struct params
       , chunk_size(vm["chunk-size"].as<std::size_t>())
       , polling_interval(vm["interval"].as<int>())
       , verbose(vm["verbose"].as<int>())
+      , header(vm["header"].as<int>())
       , debug(vm["debug"].as<int>())
     {}
 
@@ -114,6 +115,7 @@ struct params
         ar & chunk_size;
         ar & polling_interval;
         ar & verbose;
+        ar & header;
         ar & debug;
     }
 
@@ -129,6 +131,7 @@ struct params
     std::size_t chunk_size;
     int polling_interval;
     int verbose;
+    int header;
     int debug;
 };
 
@@ -201,8 +204,14 @@ inline boost::program_options::options_description uts_params_desc()
         (
             "verbose"
           , boost::program_options::value<int>()->default_value(1)
-          , "nonzero to set verbose output"
+          , "nonzero to set verbose output (zero for csv output)"
         )
+        (
+            "header"
+          , boost::program_options::value<int>()->default_value(1)
+          , "csv header set to 0 for no header (only used for verbose=0)"
+        )
+
         (
             "debug"
           , boost::program_options::value<int>()->default_value(0)

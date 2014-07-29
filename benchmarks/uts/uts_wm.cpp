@@ -53,7 +53,7 @@ int hpx_main(boost::program_options::variables_map & vm)
     std::vector<components::wm_stealstack::stats> stats;
     stats.reserve(stealstacks.size());
     hpx::wait(stats_futures, stats);
-    show_stats(elapsed, stats, vm["verbose"].as<int>(), vm["chunk-size"].as<std::size_t>(), vm["overcommit-factor"].as<float>());
+    show_stats(elapsed, stats, vm["verbose"].as<int>(), vm["header"].as<int>(), vm["chunk-size"].as<std::size_t>(), vm["overcommit-factor"].as<float>());
 
     return hpx::finalize();
 }

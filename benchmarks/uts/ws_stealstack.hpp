@@ -352,7 +352,7 @@ namespace components
             {
                 //std::vector<stealstack_node> ss_nshare;
                 std::vector<node> nshare;
-                std::size_t temp_count = 0;
+                //std::size_t temp_count = 0;
                     
                 BOOST_ASSERT(!local_q_.empty());
                 std::size_t transfer_size = local_q_.size()/2;
@@ -401,7 +401,7 @@ namespace components
                     std::vector<count_itr_type> ranges;
 
                     std::size_t chunk_commit = 0;
-                    std::size_t remainder = num_children;
+                    // std::size_t remainder = num_children;
                     while(chunk_commit != num_children)
                     {   
                         if((num_children - chunk_commit) <  2 * MAX_SPAWN_GRANULARITY)
@@ -502,7 +502,7 @@ namespace components
                 typedef std::pair<bool, std::vector<node> > node_pair_type;
                 node_pair_type node_pair(steal_work());
 
-                std::size_t temp_count = 0;
+                // std::size_t temp_count = 0;
                 if(node_pair.first)
                 {   
                     BOOST_ASSERT(node_pair.second.size() != 0);

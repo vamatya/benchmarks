@@ -390,7 +390,7 @@ void show_stats(double walltime, Stats const & stats, int verbose, int header, s
     if (verbose == 0) {
         if (header == 1){
             hpx::cout << "OS_Threads,Num_localities,Execution_Time,"
-                "Nodes_traversed,Chunk_size,Overcommit_factor\n"
+                "Nodes_trans,Ntr_per_sec,Ntrps_per_thread,Chunk_size,Overcommit_factor\n"
             << hpx::flush;
         }
         std::size_t num_threads = hpx::get_num_worker_threads();
@@ -400,8 +400,13 @@ void show_stats(double walltime, Stats const & stats, int verbose, int header, s
             << locs.get() << ","
             << walltime << ","
             << tnodes << ","
+<<<<<<< Updated upstream
+            << static_cast<long long>(tnodes/walltime) << ","
+            << static_cast<long long>((tnodes/walltime)/num_threads) << ","
+=======
             //<< static_cast<long long>(tnodes/walltime) << ","
-            //<< static_cast<long long>((tnodes/walltime)/num_threads) << ","
+          //  << static_cast<long long>((tnodes/walltime)/num_threads) << ","
+>>>>>>> Stashed changes
             << chunk_size << ","
             << overcommit_factor << "\n"
             << hpx::flush;

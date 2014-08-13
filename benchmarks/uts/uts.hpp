@@ -400,13 +400,8 @@ void show_stats(double walltime, Stats const & stats, int verbose, int header, s
             << locs.get() << ","
             << walltime << ","
             << tnodes << ","
-<<<<<<< Updated upstream
             << static_cast<long long>(tnodes/walltime) << ","
             << static_cast<long long>((tnodes/walltime)/num_threads) << ","
-=======
-            //<< static_cast<long long>(tnodes/walltime) << ","
-          //  << static_cast<long long>((tnodes/walltime)/num_threads) << ","
->>>>>>> Stashed changes
             << chunk_size << ","
             << overcommit_factor << "\n"
             << hpx::flush;

@@ -190,6 +190,22 @@ namespace components
             mutex_type::scoped_lock lk(mtx);
             return data.size();
         }
+
+        template<typename InputIterator>
+        void insert_end(InputIterator in_start_, InputIterator in_end_)
+        {
+            std::deque<T>::iterator itr_e = data.end();
+            mutex_type::scoped_lock lk(mtx);
+            data.insert(itr_e, in_start_, in_end_);
+        }
+
+        template<typename InputIterator>
+        void insert_begin(InputIterator in_start_, InputIterator in_end_)
+        {
+            std::deque<T>::iterator itr_b = data.begin();
+            mutex_type::scoped_lock lk(mtx);
+            data.insert(itr_b, in_start_, in_end_);
+        }
     };
 
     template<typename R, typename NODE, typename P, typename WS_SS>
@@ -294,6 +310,8 @@ namespace components
         }
 
         typedef hpx::lcos::local::spinlock mutex_type;
+        mutex_type local_work_mtx;
+        mutex_type shared_work_mtx;
         
         void init(params p, std::size_t r, std::size_t s, hpx::naming::id_type id)
         {
@@ -316,7 +334,10 @@ namespace components
             {
                 node n;
                 n.init_root(param);
-                put_work(n);
+                std::vector<node> n_vec(1,n);
+                //n_vec.push_back(n);
+                //put_work(n);
+                put_work(n_vec);
             }
         }
 
@@ -339,32 +360,41 @@ namespace components
 
         HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, put_work_sharedq);
 
-        void put_work(node const & n)
+        void put_work(std::vector<node> const & n)
         {   
-            if(local_q_.size() < max_localq_size)
-            {  
-                local_q_.push_back(n);
-                ++local_work;
-                std::size_t local_work_tmp = local_work;                
-                stat.max_stack_depth = (std::max)(local_work_tmp + sharedq_work, stat.max_stack_depth);
-            }
-            else
-            {
-                //std::vector<stealstack_node> ss_nshare;
-                std::vector<node> nshare;
-                //std::size_t temp_count = 0;
-                    
-                BOOST_ASSERT(!local_q_.empty());
-                std::size_t transfer_size = local_q_.size()/2;
-                nshare.resize(transfer_size);
-                local_q_.pop_back(nshare);
+            mutex_type::scoped_lock lk(local_work_mtx);
+            {            
+                std::vector<node>::const_iterator itr_b = n.begin();
+                std::vector<node>::const_iterator itr_e = n.end();
+                //if(local_q_.size() < max_localq_size)
+                if(local_work < max_localq_size)
+                {  
+                    //local_q_.push_back(n);                    
+                    local_q_.insert_end(itr_b, itr_e);
+                    local_work += n.size();
+                                
+                    stat.max_stack_depth = (std::max)(local_work + sharedq_work, stat.max_stack_depth);
+                }
+                else
+                {
+                    //std::vector<stealstack_node> ss_nshare;
+                    std::vector<node> nshare;
+                    //std::size_t temp_count = 0;
+                    //TO DO: 
+                    BOOST_ASSERT(!local_q_.empty());
+                    //std::size_t transfer_size = local_q_.size()/2;
+                    std::size_t transfer_size = local_work - (max_localq_size/2);//local_work/2;
+                    nshare.resize(transfer_size);
+                    local_q_.pop_back(nshare);
 
-               local_work -= nshare.size();//transfer_size;
-               put_work_sharedq(nshare);
-               local_q_.push_back(n);
-               ++local_work;
-               std::size_t local_work_tmp = local_work;
-               stat.max_stack_depth = (std::max)(local_work_tmp + sharedq_work, stat.max_stack_depth);
+                    local_work -= nshare.size();//transfer_size;
+                    put_work_sharedq(nshare);
+                    //local_q_.push_back(n);
+                    local_q_.insert_end(itr_b, itr_e);
+                    local_work += n.size();
+
+                    stat.max_stack_depth = (std::max)(local_work + sharedq_work, stat.max_stack_depth);
+                }
             }
         }
 
@@ -383,6 +413,8 @@ namespace components
             {
                 if(num_children < MAX_SPAWN_GRANULARITY)
                 {
+                    //accumulate all generated childen nodes
+                    std::vector<node> child_nodes;
                     for(int i = 0; i < num_children; ++i)
                     {
                         node child;
@@ -392,8 +424,11 @@ namespace components
                         {
                             rng_spawn(parent.state.state, child.state.state, i);
                         }
-                        put_work(child);
+                        //put_work(child);
+                        child_nodes.push_back(child);
                     }
+                    put_work(child_nodes);
+                    child_nodes.clear();
                 }
                 else
                 {
@@ -430,7 +465,8 @@ namespace components
                         spawn_work<count_itr_type, node_type, param_type, ws_stealstack_type*> sp_work;
                         fun_obj_futures.push_back(
                             hpx::async(
-                                HPX_STD_BIND(
+                                //HPX_STD_BIND(
+                                std::bind(
                                     sp_work
                                     , rng
                                     , boost::ref(parent)
@@ -494,7 +530,8 @@ namespace components
 
         bool ensure_local_work()
         {   
-            while(local_q_.size() == 0)
+            //while(local_q_.size() == 0)
+            while(local_work == 0)
             {   
                 bool terminate = true; 
 
@@ -515,9 +552,12 @@ namespace components
                 
 
                 /// check if local stealing was successful, else steal from others
-                if(terminate && local_q_.size() < 1)  //local_work < 1)
+                //if(terminate && local_q_.size() < 1)  //local_work < 1)
+                if(terminate && local_work < 1)
                 {
-                    BOOST_ASSERT(local_q_.size() == 0 && shared_q_.size() == 0);//sharedq_work == 0);
+                    BOOST_ASSERT(local_work >= 0);
+                    //BOOST_ASSERT(local_q_.size() == 0 && shared_q_.size() == 0);//sharedq_work == 0);
+                    BOOST_ASSERT(local_work == 0 && sharedq_work == 0);
 
                     /// No work in local shared queue, look for work in other shared queue
                     for(std::size_t i = 0; i < size -1; ++i)
@@ -648,6 +688,8 @@ namespace components
         boost::atomic<std::size_t> local_work;
         //std::size_t local_work;
         boost::atomic<std::size_t> sharedq_work;
+        //std::size_t sharedq_work;
+
         hpx::id_type my_id;
 
         stats stat;
@@ -687,6 +729,7 @@ namespace components
     {
         int child_type = parent.child_type(param_);
         std::size_t parent_height = parent.height;
+        std::vector<node> child_vec;
         BOOST_FOREACH(std::size_t i, range)
         {
             node child;
@@ -697,8 +740,11 @@ namespace components
             {
                 rng_spawn(parent.state.state, child.state.state,(int)i);
             }
-            this_ss->put_work(child);
-        }            
+            //std::vector<node> child_vec;
+            child_vec.push_back(child);
+        }
+        this_ss->put_work(child_vec);
+        
     }
 }
 

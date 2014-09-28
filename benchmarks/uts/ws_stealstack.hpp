@@ -18,6 +18,7 @@
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/range/counting_range.hpp>
 #include <boost/range/algorithm.hpp>
+#include <tuple>
 
 namespace components
 {
@@ -306,6 +307,8 @@ namespace components
           , local_q_()
           , shared_q_()
           , my_state(WORK)
+          , local_stk_ids()
+          , remote_stk_ids()
         {
         }
 
@@ -346,6 +349,20 @@ namespace components
         void resolve_names(std::vector<hpx::id_type> const & idss)
         {
             ids = idss;
+            BOOST_FOREACH(hpx::id_type t_id, idss)
+            {
+                if(my_id != t_id)
+                {
+                    if(my_id.get_msb() == t_id.get_msb())
+                    {
+                        local_stk_ids.push_back(t_id);
+                    }
+                    else
+                    {
+                        remote_stk_ids.push_back(t_id);
+                    }
+                }
+            }
         }
 
         HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, resolve_names);
@@ -528,6 +545,26 @@ namespace components
 
         HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, check_work);
 
+        hpx::util::tuple<bool,hpx::id_type> lcl_share_work()
+        {
+            if(shared_q_.size() > param.chunk_size)
+                return boost::move(hpx::util::make_tuple(true,my_id));
+            else
+                return boost::move(hpx::util::make_tuple(false,my_id));
+        }
+
+        HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, lcl_share_work);
+
+        hpx::util::tuple<bool,hpx::id_type> remote_share_work()
+        {
+            if(shared_q_.size() > max_localq_size)
+                return boost::move(hpx::util::make_tuple(true,my_id));
+            else
+                return boost::move(hpx::util::make_tuple(false,my_id));
+        }
+
+        HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, remote_share_work);
+
         bool ensure_local_work()
         {   
             //while(local_q_.size() == 0)
@@ -552,15 +589,75 @@ namespace components
                 
 
                 /// check if local stealing was successful, else steal from others
+                // Steal from other SS within the locality first
                 //if(terminate && local_q_.size() < 1)  //local_work < 1)
                 if(terminate && local_work < 1)
                 {
-                    BOOST_ASSERT(local_work >= 0);
+                    //BOOST_ASSERT(local_work <= 0);
                     //BOOST_ASSERT(local_q_.size() == 0 && shared_q_.size() == 0);//sharedq_work == 0);
                     BOOST_ASSERT(local_work == 0 && sharedq_work == 0);
 
-                    /// No work in local shared queue, look for work in other shared queue
-                    for(std::size_t i = 0; i < size -1; ++i)
+                    /// No work in local shared queue, look for work in other shared queue within same loc
+
+                    {                
+                        //typedef hpx::future<std::tuple<bool,hpx::id_type> > future_type;
+                        typedef hpx::future<hpx::util::tuple<bool,hpx::id_type> > future_type;
+                        std::vector<future_type> check_work_futvec, cw_futvec_temp;
+                        
+                        hpx::future<std::vector<future_type> > fut_temp;
+                
+
+                        BOOST_FOREACH(hpx::id_type t_id, local_stk_ids)
+                        {
+                            check_work_futvec.push_back(hpx::async<lcl_share_work_action>(t_id));
+                        }
+
+                        std::size_t fv_count = check_work_futvec.size();
+
+                        while(fv_count != 0)
+                        {
+                            bool break_ = false;
+                            
+                            fut_temp = hpx::when_any(check_work_futvec);
+                            cw_futvec_temp = boost::move(fut_temp.get());
+                            hpx::util::tuple<bool, hpx::id_type> check_data = cw_futvec_temp.back().get();
+                            //if(std::get<0>(check_data))
+                            if(hpx::util::get<0>(check_data))
+                            {
+                                //last steal
+                                hpx::id_type l_steal_temp = hpx::util::get<1>(check_data);
+                                typedef ws_stealstack::steal_work_action action_type;
+                                action_type act;
+                                node_pair = boost::move(act(l_steal_temp));//ids[last_steal]));
+
+                                
+                                if(node_pair.first)
+                                {                 
+                                    BOOST_ASSERT(node_pair.second.size() != 0);
+                                    terminate = false;
+                                    break_ = true;
+
+                                    //Depth First Search
+                                    local_q_.push_back(node_pair.second);
+                                    local_work += node_pair.second.size();
+                                }
+                            }
+                            if(break_ || local_work > 0)
+                            {
+                                //l_steal = l_steal_temp;
+                                break;
+                            }
+                            else
+                            {
+                                cw_futvec_temp.pop_back();
+                                check_work_futvec = boost::move(cw_futvec_temp);
+                                --fv_count;
+                                //cw_futvec_temp = hpx::when_any(check_work_futvec);
+                            }
+                        }
+                    }
+
+                    /*for(std::size_t i = 0; i < size -1; ++i)
                     {   
                         if(last_steal == rank) last_steal = (last_steal + 1) % size;
                     
@@ -581,18 +678,28 @@ namespace components
                             local_work += node_pair.second.size();
                         }
                     
-                        if(break_ || local_q_.size() > 0) 
+                        //if(break_ || local_q_.size() > 0) 
+                        if(break_ || local_work > 0) 
                         {
                             last_steal = last_steal_temp;
                             break;
                         }
 
                         last_steal = (last_steal + 1) % size;
-                    }
+                    }*/
                 }
 
+                //Steal Work from other nodes
+                if(terminate && local_work < 1)
+                {
+                    
+                }
+                
+                //Termination Detection Phase
                 //Check if there is any work remaining throughout, if stealing unsuccessful. 
-                if(terminate && local_q_.size() < 1)
+                //Check if work is present within other SS within the node
+                //if(terminate && local_q_.size() < 1)
+                if(terminate && local_work < 1)
                 {
                     std::vector<hpx::future<bool> > check_work_futures;
                     typedef components::ws_stealstack::check_work_action action_type;
@@ -682,8 +789,8 @@ namespace components
 
     private:
         std::vector<hpx::id_type> ids;
-        std::vector<hpx::id_type> local_cmp_ids;
-        std::vector<hpx::id_type> remote_cmp_ids;
+        std::vector<hpx::id_type> local_stk_ids;
+        std::vector<hpx::id_type> remote_stk_ids;
 
         boost::atomic<std::size_t> local_work;
         //std::size_t local_work;
@@ -721,6 +828,8 @@ namespace components
         bool pollint_adaptive;
         std::size_t rank;
         std::size_t size;
+
+        std::tuple<bool,hpx::id_type> tup_obj;
     };
 
     template<typename R, typename NODE, typename P, typename WS_SS>

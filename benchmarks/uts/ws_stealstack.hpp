@@ -307,8 +307,8 @@ namespace components
           , local_q_()
           , shared_q_()
           , my_state(WORK)
+          , num_loc_(0)
           , local_stk_ids()
-          , remote_stk_ids()
         {
         }
 
@@ -316,12 +316,13 @@ namespace components
         mutex_type local_work_mtx;
         mutex_type shared_work_mtx;
         
-        void init(params p, std::size_t r, std::size_t s, hpx::naming::id_type id)
+        void init(params p, std::size_t r, std::size_t s, hpx::naming::id_type id, std::size_t num_loc)
         {
             rank = r;
             size = s;
             param = p;
             my_id = id;
+            num_loc_ = num_loc;
             
             last_steal = rank;
 
@@ -349,20 +350,56 @@ namespace components
         void resolve_names(std::vector<hpx::id_type> const & idss)
         {
             ids = idss;
+            //boost::uint32_t my_loc_id = hpx::naming::get_locality_from_id(my_id);
+            hpx::id_type my_loc_id = hpx::naming::get_locality_from_id(my_id);
+            std::size_t remote_count = num_loc_ - 1;
+            //bool inserted = false;
             BOOST_FOREACH(hpx::id_type t_id, idss)
             {
-                if(my_id != t_id)
+                bool inserted = false;
+                               
+                hpx::id_type temp_loc_id = hpx::naming::get_locality_from_id(t_id);
+                if(my_loc_id ==  temp_loc_id)
                 {
-                    if(my_id.get_msb() == t_id.get_msb())
+                    //hpx::id_type here = hpx::find_here();
+                    //BOOST_ASSERT(hpx::naming::get_locality_from_id(here) == hpx::naming::get_locality_from_id(my_id));
+                    //BOOST_ASSERT(here.get_lsb() != my_id.get_lsb());
+                    if(my_id != t_id)
                     {
                         local_stk_ids.push_back(t_id);
+                        inserted = true;
                     }
-                    else
+                }
+                else
+                {
+                    if(remote_stks_vec.size() == 0)
                     {
-                        remote_stk_ids.push_back(t_id);
+                        remote_stks_type temp_node_stacks(1,t_id);
+                        remote_stks_vec.push_back(temp_node_stacks);
+                        --remote_count;
+                        inserted = true;
+                    }
+
+                    BOOST_FOREACH(remote_stks_type &rnode_stks, remote_stks_vec)
+                    {
+                        if(hpx::naming::get_locality_from_id(rnode_stks[0]) 
+                            == temp_loc_id)
+                        {
+                            rnode_stks.push_back(t_id);
+                            inserted = true;
+                        }
+                    }
+
+                    if(!inserted)
+                    {
+                        remote_stks_type temp_node_stacks(1,t_id);
+                        remote_stks_vec.push_back(temp_node_stacks);
+                        --remote_count;
+                        inserted = true;
                     }
                 }
             }
+            BOOST_ASSERT(remote_count == 0);
         }
 
         HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, resolve_names);
@@ -386,10 +423,10 @@ namespace components
                 //if(local_q_.size() < max_localq_size)
                 if(local_work < max_localq_size)
                 {  
-                    //local_q_.push_back(n);                    
+                    //local_q_.push_back(n);
                     local_q_.insert_end(itr_b, itr_e);
                     local_work += n.size();
-                                
+                    
                     stat.max_stack_depth = (std::max)(local_work + sharedq_work, stat.max_stack_depth);
                 }
                 else
@@ -712,12 +749,29 @@ namespace components
                         }
                     }
                                 
-                    BOOST_FOREACH(hpx::future<bool> & fut, check_work_futures)
+                    std::size_t fv_count = check_work_futures.size();
+                    hpx::future<std::vector<hpx::future<bool> > > fut_temp;
+                    std::vector<hpx::future<bool> > cw_futures_temp;
+                    while(fv_count != 0)
                     {
-                        if(fut.get())
+                        bool break_ = false;
+
+                        fut_temp = hpx::when_any(check_work_futures);
+                        cw_futures_temp = boost::move(fut_temp.get());
+                        bool work_present = cw_futures_temp.back().get();
+                        
+                        if(work_present)
                         {
-                            terminate =  false;
+                            terminate = false;
                             break;
+                            //last steal
+                        }
+                        else
+                        {
+                            cw_futures_temp.pop_back();
+                            check_work_futures = boost::move(cw_futures_temp);
+                            --fv_count;
+                            //cw_futvec_temp = hpx::when_any(check_work_futvec);
                         }
                     }
                 }
@@ -790,7 +844,8 @@ namespace components
     private:
         std::vector<hpx::id_type> ids;
         std::vector<hpx::id_type> local_stk_ids;
-        std::vector<hpx::id_type> remote_stk_ids;
+        typedef std::vector<hpx::id_type> remote_stks_type;
+        std::vector<remote_stks_type> remote_stks_vec;
 
         boost::atomic<std::size_t> local_work;
         //std::size_t local_work;
@@ -828,6 +883,7 @@ namespace components
         bool pollint_adaptive;
         std::size_t rank;
         std::size_t size;
+        std::size_t num_loc_;
 
         std::tuple<bool,hpx::id_type> tup_obj;
     };

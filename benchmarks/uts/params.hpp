@@ -7,6 +7,8 @@
 #ifndef BENCHMARKS_UTS_PARAMS_HPP
 #define BENCHMARKS_UTS_PARAMS_HPP
 
+#define HPX_LIMIT 8
+
 #include <benchmarks/uts/rng/rng.h>
 #include <benchmarks/uts/uts.hpp>
 
@@ -333,7 +335,7 @@ inline std::vector<hpx::id_type> create_stealstacks(
         hpx::components::get_component_type<StealStack>();
     
     id_vector_type localities = hpx::find_all_localities(type);
-
+    std::size_t num_loc = localities.size();
 
     using hpx::components::distributing_factory;
 
@@ -368,7 +370,7 @@ inline std::vector<hpx::id_type> create_stealstacks(
     BOOST_FOREACH(hpx::id_type id, hpx::util::locality_results(res))
     {
         init_futures.push_back(
-            hpx::async<typename StealStack::init_action>(id, p, i, num_stealstacks, id));
+            hpx::async<typename StealStack::init_action>(id, p, i, num_stealstacks, id, num_loc));
         stealstacks.push_back(id);
         ++i;
     }

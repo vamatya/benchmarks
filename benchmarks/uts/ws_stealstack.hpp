@@ -195,7 +195,7 @@ namespace components
         template<typename InputIterator>
         void insert_end(InputIterator in_start_, InputIterator in_end_)
         {
-            std::deque<T>::iterator itr_e = data.end();
+            typename std::deque<T>::iterator itr_e = data.end();
             mutex_type::scoped_lock lk(mtx);
             data.insert(itr_e, in_start_, in_end_);
         }
@@ -203,7 +203,7 @@ namespace components
         template<typename InputIterator>
         void insert_begin(InputIterator in_start_, InputIterator in_end_)
         {
-            std::deque<T>::iterator itr_b = data.begin();
+            typename std::deque<T>::iterator itr_b = data.begin();
             mutex_type::scoped_lock lk(mtx);
             data.insert(itr_b, in_start_, in_end_);
         }

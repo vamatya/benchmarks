@@ -538,9 +538,87 @@ namespace components
             }
         }
 
+        
+
+        //For Termination Detection. 
+        bool check_work()
+        {
+            //mutex_type::scoped_lock lk(check_work_mtx);	//##################
+            if(shared_q_.size() > 0 || local_q_.size() > 0)
+                return true;
+            else 
+                return false;
+        }
+
+        HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, check_work);
+
+        /////////////////////////////////////////////////////////////////////
+        bool terminate_remote_check_work()
+        {
+            bool work_present = false;
+            if(shared_q_.size() > 0 || local_q_.size() > 0)
+            {
+                return true;
+            }
+            else  // check other threads on the same node
+            {
+                typedef std::vector<hpx::future<bool> > vec_fut_type;
+                vec_fut_type check_work_futvec, chk_wrk_fvec_temp;
+                typedef components::ws_stealstack::check_work_action action_type;
+                BOOST_FOREACH(hpx::id_type id, local_stk_ids)
+                {
+                    check_work_futvec.push_back(hpx::async<action_type>(id));
+                }
+                
+                while(check_work_futvec.size() != 0)
+                {
+                    hpx::future<vec_fut_type> temp_fut = hpx::when_any(
+                        check_work_futvec);
+                    chk_wrk_fvec_temp = boost::move(temp_fut.get());
+                    bool tmp = chk_wrk_fvec_temp.back().get();
+                    
+                    if(tmp)
+                    {
+                        work_present = true;
+                        break;
+                    }
+                    
+                    chk_wrk_fvec_temp.pop_back();
+                    check_work_futvec = boost::move(chk_wrk_fvec_temp);
+                }
+                if(work_present)
+                    return true;
+            }
+            return false;
+        }
+
+        HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, terminate_remote_check_work);
+        /////////////////////////////////////////////////////////////////////
+
+        //For Local Work Check
+        hpx::util::tuple<bool,hpx::id_type> lcl_check_work()
+        {
+            if(shared_q_.size() > param.chunk_size)
+                return boost::move(hpx::util::make_tuple(true,my_id));
+            else
+                return boost::move(hpx::util::make_tuple(false,my_id));
+        }
+
+        HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, lcl_check_work);
+
+        // Report Total work available for stealing
+        // For Remote Stealing
+        hpx::util::tuple<std::size_t,hpx::id_type> shared_que_size()
+        {
+            return boost::move(hpx::util::make_tuple(shared_q_.size(), my_id));
+        }
+        
+        HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, shared_que_size);
+        
         /// steal only chunk size
         //std::pair<bool, std::vector<stealstack_node> > steal_work()
-        std::pair<bool, std::vector<node> > steal_work()
+        //std::pair<bool, std::vector<node> > ssteal_work(id)
+        std::pair<bool, std::vector<node> > lcl_steal_work()
         {   
             std::pair<bool, std::vector<node> > res =
                 std::make_pair(false, std::vector<node>());
@@ -569,38 +647,191 @@ namespace components
             return res;
         }
 
-        HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, steal_work);
+        HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, lcl_steal_work);
 
-        bool check_work()
+        //remote check work, on each node
+        hpx::util::tuple<bool, hpx::id_type> remote_check_work()
         {
-            //mutex_type::scoped_lock lk(check_work_mtx);	//##################
-            if(shared_q_.size() > 0 || local_q_.size() > 0)
-                return true;
-            else 
-                return false;
-        }
-
-        HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, check_work);
-
-        hpx::util::tuple<bool,hpx::id_type> lcl_share_work()
-        {
-            if(shared_q_.size() > param.chunk_size)
-                return boost::move(hpx::util::make_tuple(true,my_id));
+            typedef hpx::util::tuple<bool, hpx::id_type> tup_type;
+            tup_type res = hpx::util::make_tuple(false, my_id);
+            //check shared_q work of the first destination 
+            if(shared_q_.size() >= max_localq_size)
+            {
+                hpx::util::get<0>(res) = true;
+                return res;
+            }
             else
-                return boost::move(hpx::util::make_tuple(false,my_id));
+            {
+                std::size_t cumulative_work = shared_q_.size();
+                
+                //check work in queues of same loc
+                typedef hpx::util::tuple<std::size_t,hpx::id_type> data_type;
+                typedef hpx::future<data_type> future_type;
+                std::vector<future_type> chk_work_fut, chk_work_fut_temp;
+                BOOST_FOREACH(hpx::id_type id, local_stk_ids)
+                {
+                    chk_work_fut.push_back(hpx::async<shared_que_size_action>(id));
+                }
+
+                while(chk_work_fut.size() !=0)
+                {
+                    hpx::future<std::vector<future_type> > fut_temp;
+                    fut_temp = hpx::when_any(chk_work_fut);
+                    chk_work_fut_temp = boost::move(fut_temp.get());
+                    data_type chk_wrk = chk_work_fut_temp.back().get();
+
+                    if(hpx::util::get<0>(chk_wrk) >= max_localq_size)
+                    {
+                        hpx::util::get<0>(res) = true;
+                        hpx::util::get<1>(res) = hpx::util::get<1>(chk_wrk);
+                        break;
+                    }
+                    else
+                    {
+                        cumulative_work = hpx::util::get<0>(chk_wrk);
+                    }
+
+                    //Cumulative work on node is good to be stolen
+                    if(cumulative_work > 1.5 * max_localq_size)
+                    {
+                        hpx::util::get<0>(res) = true;
+                        break;
+                    }
+                    
+                    chk_work_fut_temp.pop_back();
+                    chk_work_fut = boost::move(chk_work_fut_temp);
+                }
+                return res;
+            }
         }
 
-        HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, lcl_share_work);
+        HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, remote_check_work);
 
-        hpx::util::tuple<bool,hpx::id_type> remote_share_work()
+        //////////////////////////////////////////////////////////////////////
+        // steal up to max_local_q size from a remote stack. 
+        // invoked within the remote node.
+        hpx::util::tuple<bool, std::vector<node> > remote_steal_work()
         {
-            if(shared_q_.size() > max_localq_size)
-                return boost::move(hpx::util::make_tuple(true,my_id));
-            else
-                return boost::move(hpx::util::make_tuple(false,my_id));
+            hpx::util::tuple<bool, std::vector<node> > res = 
+                hpx::util::make_tuple(false, std::vector<node>());
+
+            if(sharedq_work > param.chunk_size) 
+            {
+                std::size_t steal_num = 0;
+                if(sharedq_work > max_localq_size)
+                {
+                    steal_num = max_localq_size; //max_localq_size
+                    
+                }
+                else if(sharedq_work >= 2 * param.chunk_size)
+                {   
+                    // find chunk_value for remote stealing 
+                    bool found_cvalue = false;
+
+                    std::size_t temp = max_localq_size;
+                    // find the right chunk-sizes to steal
+                    while(!found_cvalue)
+                    {       
+                        // FIX ME: ?
+                        std::size_t temp1 = temp/2;
+                        if(sharedq_work > temp1 )
+                        {
+                            steal_num = temp1;
+                            found_cvalue = true;
+                        }
+                        temp = temp1;
+                    }
+                }
+                else
+                {
+                    steal_num = param.chunk_size;
+                }
+
+                shared_q_.pop_back(hpx::util::get<1>(res),max_localq_size);
+                sharedq_work -= hpx::util::get<1>(res).size(); // max_localq_size
+                
+                if(hpx::util::get<1>(res).size() != 0)
+                {
+                    hpx::util::get<0>(res) = true;
+                }
+            }
+            return res;
         }
 
-        HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, remote_share_work);
+        HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, remote_steal_work);
+
+        /////////////////////////////////////////////////////////////////////////
+        // Aggregate work steal from a node 
+        hpx::util::tuple<bool, std::vector<node> > remote_aggregate_steal_work()
+        {
+            typedef  std::vector<node> node_vec_type;
+            node_vec_type collect_work;
+            typedef hpx::util::tuple<bool, std::vector<node> > result_type;
+            result_type res = 
+                hpx::util::make_tuple(false, std::vector<node>());
+
+            result_type lcl_res = remote_steal_work();
+
+            if(hpx::util::get<0>(lcl_res))
+            {
+                //hpx::util::get<1>(res) = hpx::util::get<1>(lcl_res);
+                collect_work = hpx::util::get<1>(lcl_res);
+            }
+
+            if(collect_work.size() > max_localq_size)
+            {
+                hpx::util::get<0>(res) = true;
+                hpx::util::get<1>(res) = collect_work;
+                return res;
+            }
+
+            BOOST_FOREACH(hpx::id_type id, local_stk_ids)
+            {
+                hpx::future<result_type> temp_fut = hpx::async<remote_steal_work_action>(id);
+                result_type temp_res = boost::move(temp_fut.get());
+                
+                if(hpx::util::get<0>(temp_res))
+                {
+                    node_vec_type temp_vec = hpx::util::get<1>(temp_res);
+                    node_vec_type::iterator it_b = temp_vec.begin();
+                    node_vec_type::iterator it_e = temp_vec.end();
+                    
+                    node_vec_type::iterator it_agg = collect_work.end();
+
+                    collect_work.insert(it_agg, it_b, it_e);
+                }
+                if(collect_work.size() >= max_localq_size)
+                {
+                    break;
+                }
+            }
+
+            if(collect_work.size() != 0)
+            {
+                hpx::util::get<0>(res) = true;
+                hpx::util::get<1>(res) = collect_work;
+            }
+
+            return res;
+        }
+        
+        HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, remote_aggregate_steal_work);
+
+        //////////////////////////////////////////////////////////////////////
+        /*hpx::util::tuple<bool,std::vector<node> > remote_node_share_work()
+        {
+            typedef hpx::util::tuple<bool, std::vector<node> > res_type;
+            res_type res = 
+                hpx::util::make_tuple(false, std::vector<node>());
+
+            std::vector<hpx::future<res_type> > res_fut_vec;
+            //res_fut_vec.push_back(hpx::async<remote_node_share_work>(my_id));
+
+            return res;
+        }
+
+        HPX_DEFINE_COMPONENT_ACTION(ws_stealstack, remote_node_share_work);*/
+        //////////////////////////////////////////////////////////////////////
 
         bool ensure_local_work()
         {   
@@ -611,7 +842,7 @@ namespace components
 
                 // steal work from own shared q first 
                 typedef std::pair<bool, std::vector<node> > node_pair_type;
-                node_pair_type node_pair(steal_work());
+                node_pair_type node_pair(lcl_steal_work());
 
                 // std::size_t temp_count = 0;
                 if(node_pair.first)
@@ -646,7 +877,7 @@ namespace components
 
                         BOOST_FOREACH(hpx::id_type t_id, local_stk_ids)
                         {
-                            check_work_futvec.push_back(hpx::async<lcl_share_work_action>(t_id));
+                            check_work_futvec.push_back(hpx::async<lcl_check_work_action>(t_id));
                         }
 
                         std::size_t fv_count = check_work_futvec.size();
@@ -663,7 +894,7 @@ namespace components
                             {
                                 //last steal
                                 hpx::id_type l_steal_temp = hpx::util::get<1>(check_data);
-                                typedef ws_stealstack::steal_work_action action_type;
+                                typedef ws_stealstack::lcl_steal_work_action action_type;
                                 action_type act;
                                 node_pair = boost::move(act(l_steal_temp));//ids[last_steal]));
 
@@ -692,45 +923,71 @@ namespace components
                                 //cw_futvec_temp = hpx::when_any(check_work_futvec);
                             }
                         }
+                    }                   
+                }
+
+                //Distributed Work Stealing? (Latency might cause inability to work stealing. 
+                //Get Work from other nodes
+                if(num_loc_ > 1)
+                {
+                    if(terminate && local_work < 1)
+                    {
+                        BOOST_ASSERT(local_work == 0 && sharedq_work == 0);
+
+                        typedef hpx::util::tuple<bool, std::vector<node> > node_vec_result_type;
+                        typedef hpx::util::tuple<bool, hpx::id_type> data_type;
+                        typedef hpx::future<data_type> future_type;
+                        std::vector<future_type> chk_rwork_fvec, chk_rwork_fvec_temp;
+
+                        hpx::future<std::vector<future_type> > fut_temp;
+                        data_type temp;
+
+                        BOOST_FOREACH(std::vector<hpx::id_type> rmt_node, remote_stks_vec)
+                        {
+                            chk_rwork_fvec.push_back(hpx::async<
+                                remote_check_work_action>(rmt_node.front()));                         
+                        }
+
+                        bool break_loop = false;
+                        while(chk_rwork_fvec.size() != 0)
+                        {
+                            fut_temp = hpx::when_any(chk_rwork_fvec);
+                            chk_rwork_fvec_temp = boost::move(fut_temp.get());
+                            temp = chk_rwork_fvec_temp.back().get();
+
+                            //if work present, try to steal from that remote id/node collective
+                            if(hpx::util::get<0>(temp))
+                            {
+                                hpx::future<node_vec_result_type> fut_res;
+                                node_vec_result_type res_work_vec;
+
+                                fut_res = hpx::async<
+                                    remote_aggregate_steal_work_action>(
+                                        hpx::util::get<1>(temp));
+                                res_work_vec = boost::move(fut_res.get());
+                                if(hpx::util::get<0>(res_work_vec))
+                                {
+                                    break_loop = true;
+                                    local_q_.push_back(hpx::util::get<1>(res_work_vec));
+                                    local_work += local_q_.size();
+                                }
+                            }
+                            if(local_work > 1)
+                            {
+                                terminate = false;
+                            }
+                            if(break_loop)
+                            {
+                                break;
+                            }
+
+                            chk_rwork_fvec_temp.pop_back();
+                            chk_rwork_fvec = boost::move(chk_rwork_fvec_temp);
+                        }
                     }
 
-                    /*for(std::size_t i = 0; i < size -1; ++i)
-                    {   
-                        if(last_steal == rank) last_steal = (last_steal + 1) % size;
-                    
-                        std::size_t last_steal_temp = last_steal;
-                        typedef ws_stealstack::steal_work_action action_type;
-                        action_type act;
-                        node_pair = boost::move(act(ids[last_steal]));
-
-                        bool break_ = false;
-                        if(node_pair.first)
-                        {                 
-                            BOOST_ASSERT(node_pair.second.size() != 0);
-                            terminate = false;
-                            break_ = true;
-
-                            //Depth First Search
-                            local_q_.push_back(node_pair.second);
-                            local_work += node_pair.second.size();
-                        }
-                    
-                        //if(break_ || local_q_.size() > 0) 
-                        if(break_ || local_work > 0) 
-                        {
-                            last_steal = last_steal_temp;
-                            break;
-                        }
-
-                        last_steal = (last_steal + 1) % size;
-                    }*/
                 }
-
-                //Steal Work from other nodes
-                if(terminate && local_work < 1)
-                {
-                    
-                }
+                
                 
                 //Termination Detection Phase
                 //Check if there is any work remaining throughout, if stealing unsuccessful. 
@@ -739,20 +996,26 @@ namespace components
                 if(terminate && local_work < 1)
                 {
                     std::vector<hpx::future<bool> > check_work_futures;
+                    check_work_futures.reserve(local_stk_ids.size());
+                    //std::cout << "Local Stacks Ids:" << local_stk_ids.size();
                     typedef components::ws_stealstack::check_work_action action_type;
 
-                    BOOST_FOREACH(hpx::id_type id, ids)
+                    /*BOOST_FOREACH(hpx::id_type id, ids)
                     {
                         if(id != my_id)
                         {
                             check_work_futures.push_back(hpx::async<action_type>(id));
                         }
+                    }*/
+                    BOOST_FOREACH(hpx::id_type t_id, local_stk_ids)
+                    {
+                        check_work_futures.push_back(hpx::async<action_type>(t_id));
                     }
                                 
                     std::size_t fv_count = check_work_futures.size();
                     hpx::future<std::vector<hpx::future<bool> > > fut_temp;
                     std::vector<hpx::future<bool> > cw_futures_temp;
-                    while(fv_count != 0)
+                    while(check_work_futures.size() != 0)
                     {
                         bool break_ = false;
 
@@ -774,6 +1037,41 @@ namespace components
                             //cw_futvec_temp = hpx::when_any(check_work_futvec);
                         }
                     }
+                    
+                    // Remote Nodes termination Detection
+                    if(num_loc_ > 1)
+                    {
+                        if(terminate && local_work < 1)
+                        {
+                            typedef std::vector<hpx::future<bool> > vec_fut_type;
+                            vec_fut_type check_work_futures, chk_wrk_fut_temp;
+                            typedef components::ws_stealstack::terminate_remote_check_work_action action_type;
+
+                            BOOST_FOREACH(std::vector<hpx::id_type> node, remote_stks_vec)
+                            {
+                                check_work_futures.push_back(hpx::async<
+                                    action_type>(node.front()));
+                                
+                            }
+                            while(check_work_futures.size() != 0)
+                            {
+                                hpx::future<vec_fut_type> tmp = 
+                                    hpx::when_any(check_work_futures);
+                                chk_wrk_fut_temp = boost::move(tmp.get());
+                                bool work_present = chk_wrk_fut_temp.back().get();
+
+                                if(work_present)
+                                {
+                                    terminate = false;
+                                    break;
+                                }
+                                chk_wrk_fut_temp.pop_back();
+                                check_work_futures = boost::move(chk_wrk_fut_temp);
+                            }
+                            
+                        }
+                    }
+
                 }
 
                 if(terminate) return false;
@@ -914,3 +1212,35 @@ namespace components
 }
 
 #endif
+
+///////////////////////////////////////////////////////////////////////////
+ /*for(std::size_t i = 0; i < size -1; ++i)
+                    {   
+                        if(last_steal == rank) last_steal = (last_steal + 1) % size;
+                    
+                        std::size_t last_steal_temp = last_steal;
+                        typedef ws_stealstack::steal_work_action action_type;
+                        action_type act;
+                        node_pair = boost::move(act(ids[last_steal]));
+
+                        bool break_ = false;
+                        if(node_pair.first)
+                        {                 
+                            BOOST_ASSERT(node_pair.second.size() != 0);
+                            terminate = false;
+                            break_ = true;
+
+                            //Depth First Search
+                            local_q_.push_back(node_pair.second);
+                            local_work += node_pair.second.size();
+                        }
+                    
+                        //if(break_ || local_q_.size() > 0) 
+                        if(break_ || local_work > 0) 
+                        {
+                            last_steal = last_steal_temp;
+                            break;
+                        }
+
+                        last_steal = (last_steal + 1) % size;
+                    }*/

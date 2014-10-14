@@ -622,19 +622,42 @@ namespace components
         {   
             std::pair<bool, std::vector<node> > res =
                 std::make_pair(false, std::vector<node>());
-
+            std::size_t steal_num = 0;
             /// For within node work stealing, steal chunk size work only
-            if(sharedq_work > param.chunk_size)
+            if(sharedq_work >= param.chunk_size)
             {
-                std::size_t steal_num = param.chunk_size;
-                //res.second.resize(steal_num);
-                shared_q_.pop_back(res.second, steal_num);
-                sharedq_work -= res.second.size();//steal_num;
+               if(sharedq_work >= max_localq_size)
+               {
+                   steal_num = max_localq_size/2;
+               }
+               else if(sharedq_work >= 2 * param.chunk_size)
+               {
+                   bool found_cvalue = false;
+                   std::size_t temp = max_localq_size;
+                   while(!found_cvalue)
+                   {
+                       std::size_t temp1 = temp/2;
+                       if(sharedq_work > temp1)
+                       {
+                           steal_num = temp1;
+                           found_cvalue = true;
+                       }
+                       temp = temp1;
+                   }
+               }
+               else
+               {
+                   steal_num = param.chunk_size;
+               }
             }
-            else if(sharedq_work > 0)
+            else
             {
-                std::size_t steal_num = sharedq_work;
+                steal_num = sharedq_work;
                 //res.second.resize(steal_num);
+            }
+
+            if(steal_num > 0)
+            {            
                 shared_q_.pop_back(res.second, steal_num);
                 sharedq_work -= res.second.size();//steal_num;
             }
@@ -692,7 +715,7 @@ namespace components
                     }
 
                     //Cumulative work on node is good to be stolen
-                    if(cumulative_work > 1.5 * max_localq_size)
+                    if(cumulative_work > 2 * max_localq_size)
                     {
                         hpx::util::get<0>(res) = true;
                         break;
@@ -720,8 +743,7 @@ namespace components
                 std::size_t steal_num = 0;
                 if(sharedq_work > max_localq_size)
                 {
-                    steal_num = max_localq_size; //max_localq_size
-                    
+                    steal_num = sharedq_work/2; //max_localq_size
                 }
                 else if(sharedq_work >= 2 * param.chunk_size)
                 {   
@@ -747,7 +769,7 @@ namespace components
                     steal_num = param.chunk_size;
                 }
 
-                shared_q_.pop_back(hpx::util::get<1>(res),max_localq_size);
+                shared_q_.pop_back(hpx::util::get<1>(res),steal_num);//max_localq_size);
                 sharedq_work -= hpx::util::get<1>(res).size(); // max_localq_size
                 
                 if(hpx::util::get<1>(res).size() != 0)
@@ -800,7 +822,7 @@ namespace components
 
                     collect_work.insert(it_agg, it_b, it_e);
                 }
-                if(collect_work.size() >= max_localq_size)
+                if(collect_work.size() > 2 * max_localq_size)
                 {
                     break;
                 }

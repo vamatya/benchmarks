@@ -572,19 +572,29 @@ namespace components
                 
                 while(check_work_futvec.size() != 0)
                 {
-                    hpx::future<vec_fut_type> temp_fut = hpx::when_any(
-                        check_work_futvec);
-                    chk_wrk_fvec_temp = boost::move(temp_fut.get());
-                    bool tmp = chk_wrk_fvec_temp.back().get();
-                    
+                    hpx::future<hpx::when_any_result<vec_fut_type> > temp_result_fut;
+                    temp_result_fut = hpx::when_any(check_work_futvec);
+
+                    hpx::when_any_result<vec_fut_type> temp_result
+                        = boost::move(temp_result_fut.get());
+                    //hpx::future<vec_fut_type> temp_fut = hpx::when_any(
+                    //    check_work_futvec);
+
+                    //chk_wrk_fvec_temp = boost::move(temp_result.futures);//temp_fut.get());
+                    //bool tmp = chk_wrk_fvec_temp.back().get();
+                    bool tmp = (temp_result.futures.at(temp_result.index)).get();
+
                     if(tmp)
                     {
                         work_present = true;
                         break;
                     }
                     
-                    chk_wrk_fvec_temp.pop_back();
-                    check_work_futvec = boost::move(chk_wrk_fvec_temp);
+                    //vec_fut_type::iterator itr = temp_result.futures.begin() + temp_result.index;
+                    temp_result.futures.erase(temp_result.futures.begin() + temp_result.index);
+                    //chk_wrk_fvec_temp.pop_back();
+                    //check_work_futvec = boost::move(chk_wrk_fvec_temp);
+                    check_work_futvec = boost::move(temp_result.futures);
                 }
                 if(work_present)
                     return true;
@@ -598,7 +608,7 @@ namespace components
         //For Local Work Check
         hpx::util::tuple<bool,hpx::id_type> lcl_check_work()
         {
-            if(shared_q_.size() > param.chunk_size)
+            if(shared_q_.size() > 0)//param.chunk_size)
                 return boost::move(hpx::util::make_tuple(true,my_id));
             else
                 return boost::move(hpx::util::make_tuple(false,my_id));
@@ -698,10 +708,19 @@ namespace components
 
                 while(chk_work_fut.size() !=0)
                 {
-                    hpx::future<std::vector<future_type> > fut_temp;
-                    fut_temp = hpx::when_any(chk_work_fut);
-                    chk_work_fut_temp = boost::move(fut_temp.get());
-                    data_type chk_wrk = chk_work_fut_temp.back().get();
+                    typedef hpx::when_any_result<std::vector<future_type> > when_any_result_type;
+                    hpx::future<when_any_result_type> temp_result_fut
+                        = hpx::when_any(chk_work_fut);
+                    //hpx::when_any_result<std::vector<future_type> > result_temp;
+                    when_any_result_type temp_result 
+                        = boost::move(temp_result_fut.get());
+                    //chk_work_fut_temp = boost::move(fut_temp.get());
+
+                    //chk_work_fut_temp = boost::move(temp_result.futures);
+
+                    data_type chk_wrk = (temp_result.futures.at(
+                                            temp_result.index)).get();
+                        //chk_work_fut_temp.back().get();
 
                     if(hpx::util::get<0>(chk_wrk) >= max_localq_size)
                     {
@@ -721,8 +740,10 @@ namespace components
                         break;
                     }
                     
-                    chk_work_fut_temp.pop_back();
-                    chk_work_fut = boost::move(chk_work_fut_temp);
+                    //chk_work_fut_temp.pop_back();
+                    temp_result.futures.erase(temp_result.futures.begin() + temp_result.index);
+                    //chk_work_fut = boost::move(chk_work_fut_temp);
+                    chk_work_fut = boost::move(temp_result.futures);
                 }
                 return res;
             }
@@ -857,8 +878,8 @@ namespace components
 
         bool ensure_local_work()
         {   
-            //while(local_q_.size() == 0)
-            while(local_work == 0)
+            while(local_q_.size() == 0)
+            //while(local_work == 0)
             {   
                 bool terminate = true; 
 
@@ -908,9 +929,20 @@ namespace components
                         {
                             bool break_ = false;
                             
-                            fut_temp = hpx::when_any(check_work_futvec);
-                            cw_futvec_temp = boost::move(fut_temp.get());
-                            hpx::util::tuple<bool, hpx::id_type> check_data = cw_futvec_temp.back().get();
+                            typedef hpx::when_any_result<std::vector<future_type> > when_any_result_type;
+                            hpx::future<when_any_result_type> temp_result_fut
+                                = hpx::when_any(check_work_futvec);
+
+                            when_any_result_type temp_result 
+                                = boost::move(temp_result_fut.get());
+
+                            
+                            //fut_temp = hpx::when_any(check_work_futvec);
+                            //cw_futvec_temp = boost::move(temp_result.futures);//fut_temp.get());
+                            hpx::util::tuple<bool, hpx::id_type> check_data =
+                                (temp_result.futures.at(temp_result.index)).get();
+                                //cw_futvec_temp.back().get();
+
                             //if(std::get<0>(check_data))
                             if(hpx::util::get<0>(check_data))
                             {
@@ -939,14 +971,20 @@ namespace components
                             }
                             else
                             {
-                                cw_futvec_temp.pop_back();
-                                check_work_futvec = boost::move(cw_futvec_temp);
+                                //cw_futvec_temp.pop_back();
+                                temp_result.futures.erase(
+                                    temp_result.futures.begin() + temp_result.index);
+                                check_work_futvec = boost::move(temp_result.futures);
+                                    //boost::move(cw_futvec_temp);
+                                
                                 --fv_count;
                                 //cw_futvec_temp = hpx::when_any(check_work_futvec);
                             }
                         }
                     }                   
                 }
+
+                BOOST_ASSERT(local_work == local_q_.size());
 
                 //Distributed Work Stealing? (Latency might cause inability to work stealing. 
                 //Get Work from other nodes
@@ -973,9 +1011,16 @@ namespace components
                         bool break_loop = false;
                         while(chk_rwork_fvec.size() != 0)
                         {
-                            fut_temp = hpx::when_any(chk_rwork_fvec);
-                            chk_rwork_fvec_temp = boost::move(fut_temp.get());
-                            temp = chk_rwork_fvec_temp.back().get();
+                            typedef hpx::when_any_result<std::vector<future_type> > when_any_result_type;
+                            hpx::future<when_any_result_type> temp_result_fut
+                                = hpx::when_any(chk_rwork_fvec);
+                            when_any_result_type temp_result
+                                = boost::move(temp_result_fut.get());
+
+                            //fut_temp = hpx::when_any(chk_rwork_fvec);
+                            //chk_rwork_fvec_temp = boost::move(temp_result.futures);//fut_temp.get());
+                            temp = (temp_result.futures.at(temp_result.index)).get();
+                                //chk_rwork_fvec_temp.back().get();
 
                             //if work present, try to steal from that remote id/node collective
                             if(hpx::util::get<0>(temp))
@@ -1003,8 +1048,11 @@ namespace components
                                 break;
                             }
 
-                            chk_rwork_fvec_temp.pop_back();
-                            chk_rwork_fvec = boost::move(chk_rwork_fvec_temp);
+                            //chk_rwork_fvec_temp.pop_back();
+                            temp_result.futures.erase(
+                                temp_result.futures.begin() + temp_result.index);
+                            chk_rwork_fvec = boost::move(temp_result.futures);
+                                //boost::move(chk_rwork_fvec_temp);
                         }
                     }
 
@@ -1041,9 +1089,16 @@ namespace components
                     {
                         bool break_ = false;
 
-                        fut_temp = hpx::when_any(check_work_futures);
-                        cw_futures_temp = boost::move(fut_temp.get());
-                        bool work_present = cw_futures_temp.back().get();
+                        typedef hpx::when_any_result<std::vector<hpx::future<bool> > > when_any_result_type;
+                        hpx::future<when_any_result_type> temp_result_fut
+                            = hpx::when_any(check_work_futures);
+                        when_any_result_type temp_result
+                            = boost::move(temp_result_fut.get());
+
+                        //fut_temp = hpx::when_any(check_work_futures);
+                        //cw_futures_temp = boost::move(temp_result.futures);//fut_temp.get());
+                        bool work_present = (temp_result.futures.at(temp_result.index)).get();
+                            //cw_futures_temp.back().get();
                         
                         if(work_present)
                         {
@@ -1053,14 +1108,21 @@ namespace components
                         }
                         else
                         {
-                            cw_futures_temp.pop_back();
-                            check_work_futures = boost::move(cw_futures_temp);
+                            //cw_futures_temp.pop_back();
+                            temp_result.futures.erase(
+                                temp_result.futures.begin() + temp_result.index);
+                            check_work_futures = boost::move(temp_result.futures);
+                                //boost::move(cw_futures_temp);
+
                             --fv_count;
                             //cw_futvec_temp = hpx::when_any(check_work_futvec);
                         }
                     }
                     
                     // Remote Nodes termination Detection
+                    BOOST_ASSERT(local_work == 0);
+                    BOOST_ASSERT(local_work == local_q_.size());
+
                     if(num_loc_ > 1)
                     {
                         if(terminate && local_work < 1)
@@ -1077,18 +1139,32 @@ namespace components
                             }
                             while(check_work_futures.size() != 0)
                             {
-                                hpx::future<vec_fut_type> tmp = 
-                                    hpx::when_any(check_work_futures);
-                                chk_wrk_fut_temp = boost::move(tmp.get());
-                                bool work_present = chk_wrk_fut_temp.back().get();
+
+                                typedef hpx::when_any_result<vec_fut_type> when_any_result_type;
+                                hpx::future <when_any_result_type> temp_result_fut
+                                    = hpx::when_any(check_work_futures);
+                                when_any_result_type temp_result
+                                    = temp_result_fut.get();
+
+
+                                //hpx::future<vec_fut_type> tmp = 
+                                    //hpx::when_any(check_work_futures);
+                                
+                                //chk_wrk_fut_temp = boost::move(temp_result.futures);//tmp.get());
+                                bool work_present = (temp_result.futures.at(
+                                                        temp_result.index)).get();
+                                    //chk_wrk_fut_temp.back().get();
 
                                 if(work_present)
                                 {
                                     terminate = false;
                                     break;
                                 }
-                                chk_wrk_fut_temp.pop_back();
-                                check_work_futures = boost::move(chk_wrk_fut_temp);
+                                //chk_wrk_fut_temp.pop_back();
+                                temp_result.futures.erase(
+                                    temp_result.futures.begin() + temp_result.index);
+                                check_work_futures = boost::move(temp_result.futures);
+                                    //boost::move(chk_wrk_fut_temp);
                             }
                             
                         }
@@ -1096,9 +1172,14 @@ namespace components
 
                 }
 
-                if(terminate) return false;
+                //std::cout << "Local Q size: " << local_q_.size() << ", Shared Q size: " <<shared_q_.size() << ", Rank: " << rank << " , terminate: " << terminate << std::endl;
+   
+                if(terminate)
+                {
+                        return false;
+                }
             }
-
+            
             return true;
         }
 
